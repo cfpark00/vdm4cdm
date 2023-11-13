@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 import math
 
 def kl_std_normal(mean_squared, var):
@@ -21,6 +22,16 @@ class FixedLinearSchedule(torch.nn.Module):
     def forward(self, t):
         return self.gamma_min + (self.gamma_max - self.gamma_min) * t
 
+class SigmoidSchedule(torch.nn.Module):
+    def __init__(self, gamma_min, gamma_max):
+        super().__init__()
+        self.gamma_min = gamma_min
+        self.gamma_max = gamma_max
+        self.b=1/(np.exp(-self.gamma_min)+1)
+        self.a=1/(np.exp(-self.gamma_max)+1)-self.b
+
+    def forward(self, t):
+        return -torch.log(1/(self.a*t+self.b)-1)
 
 class LearnedLinearSchedule(torch.nn.Module):
     def __init__(self, gamma_min, gamma_max,gamma_min_max=None):
@@ -73,7 +84,7 @@ class MonotonicLinear(nn.Module):
         )
 
 class NNSchedule(nn.Module):
-    def __init__(self, gamma_min, gamma_max,mid_dim=1024):
+    def __init__(self, gamma_min, gamma_max,mid_dim=1024,setting=None):
         super().__init__()
         self.mid_dim=mid_dim
         self.l1=MonotonicLinear(1,1,bias=True)
@@ -81,8 +92,17 @@ class NNSchedule(nn.Module):
         self.l1.bias.data[0]=gamma_min
         self.l2=MonotonicLinear(1,self.mid_dim,bias=True)
         self.l3=MonotonicLinear(self.mid_dim,1,bias=False)
+        if setting is not None:
+            if setting==2:
+                print("NNSchedule: setting 2")
+                with torch.no_grad():
+                    self.l2.weight.data*=30
+                    self.l2.bias.data*=10
+                    self.l3.weight.data*=1024
+            else:
+                assert False,"setting not supported"
 
-    def forward(self, t):
+    def forward(self, t,scale=1.):
         t_sh=t.shape
         t=t.reshape(-1,1)
         g=self.l1(t)
@@ -90,5 +110,6 @@ class NNSchedule(nn.Module):
         _g=self.l2(_g)
         _g=2.*(torch.sigmoid(_g)-0.5)
         _g=self.l3(_g)/self.mid_dim
+        _g*=scale
         g=g+_g
         return g.reshape(t_sh)

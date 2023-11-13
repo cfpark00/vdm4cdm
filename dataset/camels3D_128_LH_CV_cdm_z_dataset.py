@@ -3,30 +3,23 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, random_split, Dataset
+
 import h5py
 
 from .augmentation import Permutate, Flip, Normalize, Crop
 
+mean_cdm=10.046289443969727
+std_cdm=0.5584093332290649
 
-mean_input=0.11826974898576736
-std_input=1.0741989612579346
-mean_target=10.971004486083984
-std_target=0.5090954303741455
+def normalize_cdm(x):
+    log10=torch.log10 if isinstance(x,torch.Tensor) else np.log10
+    return (log10(x)-mean_cdm)/std_cdm
 
-def normalize_input(x):
-    return (np.log10(x+1)-mean_input)/std_input
-
-def normalize_target(x):
-    return (np.log10(x)-mean_target)/std_target
-
-def unnormalize_input(x):
-    return 10**(x * std_input + mean_input)-1
-
-def unnormalize_target(x):
-    return 10**(x * std_target + mean_target)
+def unnormalize_cdm(x):
+    return 10**(x * std_cdm + mean_cdm)
 
 class AstroDataset(Dataset):
-    def __init__(self, m_star, m_cdm, params=None, ndim=2, do_crop=False, crop=32, pad=0, aug_shift=True, transform=None):
+    def __init__(self, m_star, m_cdm,params=None, ndim=3, do_crop=False, crop=32, pad=0, aug_shift=True, transform=None):
         assert len(m_star) == len(m_cdm)
         assert params is None or len(m_cdm)==len(params)
         assert len(m_star.shape)-2 == ndim
@@ -70,7 +63,7 @@ class AstroDataset(Dataset):
         
         if self.transform:
             m_star, m_cdm = self.transform((m_star, m_cdm))
-
+        
         if self.params is not None:
             return m_star, m_cdm,params
         else:
@@ -79,12 +72,12 @@ class AstroDataset(Dataset):
 
 class AstroDataModule(LightningDataModule):
     def __init__(
-        self, z_star="0.0",z_cdm="0.0", train_transforms=None, test_transforms=None, batch_size=1, num_workers=1, ndim=2,
+        self, z_cdm1="0.0",z_cdm2="1.0",train_transforms=None, test_transforms=None, batch_size=1, num_workers=1, ndim=3,
         do_crop=False, cropsize=32, padsize=0, aug_shift=True, return_params=False,
     ):
         super().__init__()
-        self.z_star=z_star
-        self.z_cdm=z_cdm
+        self.z_cdm1=z_cdm1
+        self.z_cdm2=z_cdm2
         self.train_transforms = train_transforms
         self.test_transforms = test_transforms
         self.batch_size = batch_size
@@ -94,63 +87,50 @@ class AstroDataModule(LightningDataModule):
         self.cropsize = cropsize
         self.padsize = padsize
         self.aug_shift = aug_shift
-        self.return_params=return_params
+        self.return_params = return_params
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/2d_from_3d/LH256.h5","r") as h5:
-                mass_mstar = np.array(h5["mstar_z="+self.z_star])
-                mass_cdm = np.array(h5["mcdm_z="+self.z_cdm])
+            with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128_z/3D_LH_128.h5","r") as h5:
+                mass_mcdm1 = np.array(h5["mcdm_z="+self.z_cdm1])
+                mass_mcdm2 = np.array(h5["mcdm_z="+self.z_cdm2])
                 if self.return_params:
-                    params=np.repeat(np.array(h5["params"]),repeats=15,axis=0)
+                    params=np.array(h5["params"])
                 else:
                     params=None
             
-            mass_mstar = np.expand_dims(mass_mstar,1)
-            mass_cdm = np.expand_dims(mass_cdm,1)    
+            mass_mcdm1 = np.expand_dims(mass_mcdm1,1)
+            mass_mcdm2 = np.expand_dims(mass_mcdm2,1)        
 
-
-            data = AstroDataset(mass_mstar, mass_cdm, params=params, ndim=self.ndim, do_crop=self.do_crop, crop=self.cropsize,pad=self.padsize, aug_shift=self.aug_shift,transform=self.train_transforms)
+            data = AstroDataset(mass_mcdm1, mass_mcdm2,params=params, ndim=self.ndim, do_crop=self.do_crop, crop=self.cropsize,pad=self.padsize, aug_shift=self.aug_shift,transform=self.train_transforms)
             
             train_set_size = int(len(data) * 0.9)
             valid_set_size = len(data) - train_set_size
             self.train_data, self.valid_data = random_split(data, [train_set_size, valid_set_size])
             
         if stage == "test" or stage is None:
-            with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/2d_from_3d/CV256.h5","r") as h5:
-                mass_mstar = np.array(h5["mstar_z="+self.z_star])
-                mass_cdm = np.array(h5["mcdm_z="+self.z_cdm])
+            with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128_z/3D_CV_128.h5","r") as h5:
+                mass_mcdm1 = np.array(h5["mcdm_z="+self.z_cdm1])
+                mass_mcdm2 = np.array(h5["mcdm_z="+self.z_cdm2])
                 if self.return_params:
-                    params=np.repeat(np.array(h5["params"]),repeats=15,axis=0)
+                    params=np.array(h5["params"])
                 else:
                     params=None
-            inds=np.ones(len(mass_mstar),dtype=bool)
-            inds[2*15:(2+1)*15]=0
-            inds[8*15:(8+1)*15]=0
-            inds[17*15:(17+1)*15]=0
-            mass_mstar=mass_mstar[inds]
-            mass_cdm=mass_cdm[inds]
+            #remove sim 2,8,17
+            inds=np.ones(len(mass_mcdm1),dtype=bool)
+            inds[2]=0
+            inds[8]=0
+            inds[17]=0
+            mass_mcdm1=mass_mcdm1[inds]
+            mass_mcdm2=mass_mcdm2[inds]
             if self.return_params:
                 params=params[inds]
 
-            mass_mstar = np.expand_dims(mass_mstar,1)
-            mass_cdm = np.expand_dims(mass_cdm,1) 
+            mass_mcdm1 = np.expand_dims(mass_mcdm1,1)
+            mass_mcdm2 = np.expand_dims(mass_mcdm2,1) 
 
-            self.test_data = AstroDataset(mass_mstar, mass_cdm, params=params, ndim=self.ndim, do_crop=self.do_crop,crop=self.cropsize, pad=self.padsize, aug_shift=False,transform=self.test_transforms)
-        if stage =="all":
-            with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/2d_from_3d/LH256.h5","r") as h5:
-                mass_mstar = np.array(h5["mstar_z="+self.z_star])
-                mass_cdm = np.array(h5["mcdm_z="+self.z_cdm])
-                if self.return_params:
-                    params=np.repeat(np.array(h5["params"]),repeats=15,axis=0)
-                else:
-                    params=None
-            
-            mass_mstar = np.expand_dims(mass_mstar,1)
-            mass_cdm = np.expand_dims(mass_cdm,1)    
+            self.test_data = AstroDataset(mass_mcdm1, mass_mcdm2,params=params, ndim=self.ndim, do_crop=self.do_crop,crop=self.cropsize, pad=self.padsize, aug_shift=False,transform=self.test_transforms)
 
-            self.test_data = AstroDataset(mass_mstar, mass_cdm, params=params, ndim=self.ndim, do_crop=self.do_crop, crop=self.cropsize,pad=self.padsize, aug_shift=self.aug_shift,transform=self.train_transforms)
-            
     def train_dataloader(self):
         return DataLoader(
             self.train_data,
@@ -178,31 +158,31 @@ class AstroDataModule(LightningDataModule):
 
 def astro_normalizations():
     log_transform = transforms.Lambda(
-        lambda x: (torch.log10(x[0] + 1), torch.log10(x[1]))
+        lambda x: (torch.log10(x[0]), torch.log10(x[1]))
     )
     norm = Normalize(
-        mean_input=mean_input,
-        std_input=std_input,
-        mean_target=mean_target,
-        std_target=std_target,
+        mean_input=mean_cdm,
+        std_input=std_cdm,
+        mean_target=mean_cdm,
+        std_target=std_cdm,
     )
     return transforms.Compose([log_transform, norm])
 
 
 
-def get_dataset_2D_256_LH_CV_z(
-    z_star="0.0",
-    z_cdm="0.0",
+def get_dataset_3D_128_LH_CV_cdm_z(
+    z_cdm1="0.0",
+    z_cdm2="1.0",
     num_workers=1,
     batch_size=1,
     stage="fit",
-    cropsize=256,
+    cropsize=128,
     return_params=False,
 ):
     train_transforms = [
         astro_normalizations(),
-        Flip(ndim=2),
-        Permutate(ndim=2),
+        Flip(ndim=3),
+        Permutate(ndim=3),
     ]
 
     test_transforms = [
@@ -213,13 +193,14 @@ def get_dataset_2D_256_LH_CV_z(
     test_transforms = transforms.Compose(test_transforms)
 
     dm = AstroDataModule(
-        z_star=z_star,
-        z_cdm=z_cdm,
+        z_cdm1=z_cdm1,
+        z_cdm2=z_cdm2,
         train_transforms=train_transforms,
         test_transforms=test_transforms,
         num_workers=num_workers,
+        ndim=3,
         batch_size=batch_size,
-        do_crop=cropsize!=256, 
+        do_crop=cropsize!=128, 
         cropsize=cropsize,
         return_params=return_params,
     )

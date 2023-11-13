@@ -20,12 +20,15 @@ def unnormalize_target(x):
     return 10**(x * std_target + mean_target)
 
 class AstroDataset(Dataset):
-    def __init__(self, m_star, m_cdm, ndim=2, do_crop=False, crop=32, pad=0, aug_shift=True, transform=None):
+    def __init__(self, m_star, m_cdm, params=None, ndim=2, do_crop=False, crop=32, pad=0, aug_shift=True,
+    transform=None):
         assert len(m_star) == len(m_cdm)
+        assert params is None or len(m_cdm)==len(params)
         assert len(m_star.shape)-2 == ndim
         self.m_star = m_star
         self.m_cdm = m_cdm
-        
+        self.params=params
+
         self.ndim = ndim
         self.fullsize = m_star.shape[-1]
         self.do_crop = do_crop
@@ -47,23 +50,32 @@ class AstroDataset(Dataset):
             bidx, icrop = divmod(idx, self.ncrops)
             m_star,m_cdm = self.m_star[bidx], self.m_cdm[bidx]
             m_star,m_cdm = self.crop((m_star, m_cdm),icrop)
+            if self.params is not None:
+                params=self.params[bidx]
         else:
             m_star = self.m_star[idx]
             m_cdm = self.m_cdm[idx]
+            if self.params is not None:
+                params=self.params[idx]
         
         m_star = torch.from_numpy(m_star).to(torch.float32)
         m_cdm = torch.from_numpy(m_cdm).to(torch.float32)
-        
+        if self.params is not None:
+            params=torch.from_numpy(params).to(torch.float32)
+
         if self.transform:
             m_star, m_cdm = self.transform((m_star, m_cdm))
-            
-        return m_star, m_cdm
+        
+        if self.params is not None:
+            return m_star, m_cdm,params
+        else:
+            return m_star, m_cdm
 
 
 class AstroDataModule(LightningDataModule):
     def __init__(
         self, z_star="0.0",z_cdm="0.0",train_transforms=None, test_transforms=None, batch_size=1, num_workers=1, ndim=2,
-        do_crop=False, cropsize=32, padsize=0, aug_shift=True,
+        do_crop=False, cropsize=32, padsize=0, aug_shift=True, return_params=False,
     ):
         super().__init__()
         self.z_star=z_star
@@ -77,23 +89,31 @@ class AstroDataModule(LightningDataModule):
         self.cropsize = cropsize
         self.padsize = padsize
         self.aug_shift = aug_shift
+        self.return_params=return_params
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
             with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/2d_from_3d/CV256.h5","r") as h5:
                 mass_mstar = np.array(h5["mstar_z="+self.z_star][:360])
                 mass_cdm = np.array(h5["mcdm_z="+self.z_cdm][:360])
+                if self.return_params:
+                    params=np.repeat(np.array(h5["params"]),repeats=15,axis=0)[:360]
+                else:
+                    params=None
+
             inds=np.ones(len(mass_mstar),dtype=bool)
             inds[2*15:(2+1)*15]=0
             inds[8*15:(8+1)*15]=0
             inds[17*15:(17+1)*15]=0
             mass_mstar=mass_mstar[inds]
             mass_cdm=mass_cdm[inds]
+            if self.return_params:
+                params=params[inds]
             
             mass_mstar = np.expand_dims(mass_mstar,1)
             mass_cdm = np.expand_dims(mass_cdm,1)        
 
-            data = AstroDataset(mass_mstar, mass_cdm, ndim=self.ndim, do_crop=self.do_crop, crop=self.cropsize,pad=self.padsize, aug_shift=self.aug_shift,transform=self.train_transforms)
+            data = AstroDataset(mass_mstar, mass_cdm, params=params, ndim=self.ndim, do_crop=self.do_crop, crop=self.cropsize,pad=self.padsize, aug_shift=self.aug_shift,transform=self.train_transforms)
             
             train_set_size = int(len(data) * 0.9)
             valid_set_size = len(data) - train_set_size
@@ -103,11 +123,37 @@ class AstroDataModule(LightningDataModule):
             with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/2d_from_3d/CV256.h5","r") as h5:
                 mass_mstar = np.array(h5["mstar_z="+self.z_star][360:])
                 mass_cdm = np.array(h5["mcdm_z="+self.z_cdm][360:])
+                if self.return_params:
+                    params=np.repeat(np.array(h5["params"]),repeats=15,axis=0)[360:]
+                else:
+                    params=None
+            mass_mstar = np.expand_dims(mass_mstar,1)
+            mass_cdm = np.expand_dims(mass_cdm,1) 
+
+            self.test_data = AstroDataset(mass_mstar, mass_cdm, params=params, ndim=self.ndim, do_crop=self.do_crop,crop=self.cropsize, pad=self.padsize, aug_shift=False,transform=self.test_transforms)
+        
+        if stage == "all" or stage is None:
+            with h5py.File("/n/holystore01/LABS/itc_lab/Lab/Camels/2d_from_3d/CV256.h5","r") as h5:
+                mass_mstar = np.array(h5["mstar_z="+self.z_star])
+                mass_cdm = np.array(h5["mcdm_z="+self.z_cdm])
+                if self.return_params:
+                    params=np.repeat(np.array(h5["params"]),repeats=15,axis=0)
+                else:
+                    params=None
+
+            inds=np.ones(len(mass_mstar),dtype=bool)
+            inds[2*15:(2+1)*15]=0
+            inds[8*15:(8+1)*15]=0
+            inds[17*15:(17+1)*15]=0
+            mass_mstar=mass_mstar[inds]
+            mass_cdm=mass_cdm[inds]
+            if self.return_params:
+                params=params[inds]
 
             mass_mstar = np.expand_dims(mass_mstar,1)
             mass_cdm = np.expand_dims(mass_cdm,1) 
 
-            self.test_data = AstroDataset(mass_mstar, mass_cdm, ndim=self.ndim, do_crop=self.do_crop,crop=self.cropsize, pad=self.padsize, aug_shift=False,transform=self.test_transforms)
+            self.test_data = AstroDataset(mass_mstar, mass_cdm, params=params, ndim=self.ndim, do_crop=self.do_crop,crop=self.cropsize, pad=self.padsize, aug_shift=False,transform=self.test_transforms)
 
     def train_dataloader(self):
         return DataLoader(
@@ -155,6 +201,7 @@ def get_dataset_2D_256_CV_CV_z(
     batch_size=1,
     stage="fit",
     cropsize=256,
+    return_params=False,
 ):
     train_transforms = [
         astro_normalizations(),
@@ -178,6 +225,7 @@ def get_dataset_2D_256_CV_CV_z(
         batch_size=batch_size,
         do_crop=cropsize!=256, 
         cropsize=cropsize,
+        return_params=return_params,
     )
     dm.setup(
         stage=stage,

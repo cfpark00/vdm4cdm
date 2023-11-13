@@ -22,7 +22,7 @@ def train(
         save_dir="./data/comet_logs/",
         api_key=os.environ.get("COMET_API_KEY"),
         project_name="Mstar2Mcdm-2D-new",
-        experiment_name="LH_10_06_3",
+        experiment_name="LH_10_11_2",
     )
     trainer = Trainer(
         logger=comet_logger,
@@ -54,12 +54,16 @@ if __name__ == "__main__":
 
     dm = camels2D_256_LH_CV_z_dataset.get_dataset_2D_256_LH_CV_z(
         z_star="0.0",
-        z_cdm="0.0",
+        z_cdm="2.0",
         num_workers=num_workers,
         cropsize=cropsize,
         batch_size=batch_size,
         stage="fit",
     )
+    def draw_figure(*args):
+        return utils.draw_figure(*args,input_pk=False,names=["m_star_z=0.0","m_cdm_z=2.0"],unnormalize=True,
+        func_unnorm_input=camels2D_256_LH_CV_z_dataset.unnormalize_input,
+        func_unnorm_target=camels2D_256_LH_CV_z_dataset.unnormalize_target)
     vdm = vdm_model3.LightVDM(
         score_model=networks.UNet4VDM(
             gamma_min=gamma_min,
@@ -71,7 +75,7 @@ if __name__ == "__main__":
         gamma_min=gamma_min,
         gamma_max=gamma_max,
         image_shape=(1, cropsize,cropsize),
-        noise_schedule = "learned_nn",
-        draw_figure=utils.draw_figure,
+        noise_schedule = "learned_linear",
+        draw_figure=draw_figure,
     )
     train(model=vdm, datamodule=dm)
