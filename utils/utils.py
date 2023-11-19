@@ -208,31 +208,31 @@ def unnorm_proj_norm(field,norm_func,unnorm_func,start=0,n_proj=32,axis=0):
 
 def get_model(ckpt_path,conditioning_values=0,conditioning_channels=1,cond_value_mode="comb",cond_proj_bias=True,cropsize=256,
 gamma_min=-13.3,gamma_max=5.0,embedding_dim=48,norm_groups=8,threeD=False,noise_schedule="learned_linear",
-inpaint_model=False,
 device="cpu",verbose=0):
     n_blocks= 4
-    if inpaint_model:
-        vdm = vdm_model_inpaint.LightVDM(
-            score_model=(networks.UNet3D4VDM if threeD else networks.UNet4VDM)(
-                gamma_min=gamma_min,
-                gamma_max=gamma_max,
-                embedding_dim=embedding_dim,
-                conditioning_values=conditioning_values,
-                conditioning_channels=conditioning_channels,
-                cond_value_mode=cond_value_mode,
-                cond_proj_bias=cond_proj_bias,
-                norm_groups= norm_groups,
-                n_blocks= n_blocks,
-            ),
+    #if inpaint_model:
+    vdm = vdm_model.LightVDM(
+        score_model=(networks.UNet3D4VDM if threeD else networks.UNet4VDM)(
             gamma_min=gamma_min,
             gamma_max=gamma_max,
-            image_shape=((1, cropsize,cropsize,cropsize)if threeD else (1, cropsize,cropsize)),
+            embedding_dim=embedding_dim,
             conditioning_values=conditioning_values,
-            noise_schedule = "learned_linear",
-            draw_figure=None,
-        )
+            conditioning_channels=conditioning_channels,
+            cond_value_mode=cond_value_mode,
+            cond_proj_bias=cond_proj_bias,
+            norm_groups= norm_groups,
+            n_blocks= n_blocks,
+        ),
+        gamma_min=gamma_min,
+        gamma_max=gamma_max,
+        image_shape=((1, cropsize,cropsize,cropsize)if threeD else (1, cropsize,cropsize)),
+        conditioning_values=conditioning_values,
+        noise_schedule = "learned_linear",
+        draw_figure=None,
+    )
+    """
     else:
-        vdm = vdm_model3.LightVDM(
+        vdm = vdm_model.LightVDM(
         score_model=(networks.UNet3D4VDM if threeD else networks.UNet4VDM)(
             gamma_min=gamma_min,
             gamma_max=gamma_max,
@@ -252,6 +252,7 @@ device="cpu",verbose=0):
         noise_schedule = "learned_linear",
         draw_figure=None,
     )
+    """
 
     vdm=vdm.to(device)
     vdm=vdm.eval()
