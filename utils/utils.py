@@ -11,7 +11,7 @@ import scipy.optimize as sopt
 
 #import sys
 #sys.path.append("../")
-from model import vdm_model3,vdm_model_inpaint
+from model import vdm_model
 from model import networks
 
 def to_np(ten):
@@ -232,7 +232,7 @@ device="cpu",verbose=0):
     )
     """
     else:
-        vdm = vdm_model.LightVDM(
+        vdm = vdm_model3.LightVDM(
         score_model=(networks.UNet3D4VDM if threeD else networks.UNet4VDM)(
             gamma_min=gamma_min,
             gamma_max=gamma_max,
