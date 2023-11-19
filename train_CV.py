@@ -22,18 +22,18 @@ def train(
         save_dir="./data/comet_logs/",
         api_key=os.environ.get("COMET_API_KEY"),
         project_name="Mstar2Mcdm-2D-new",
-        experiment_name="CV_10_06_1",
+        experiment_name="CV",
     )
     trainer = Trainer(
         logger=comet_logger,
         accelerator="auto",
         devices=1 if torch.cuda.is_available() else None,
-        max_steps=100_000,
+        max_steps=1_000_000,
         val_check_interval=1000,
         check_val_every_n_epoch=None,
         gradient_clip_val=0.5,
         callbacks=[LearningRateMonitor(),
-                ModelCheckpoint(save_top_k=-1,every_n_train_steps=5_000),
+                ModelCheckpoint(save_top_k=-1,every_n_train_steps=10_000),
         ]
     )
     trainer.fit(model=model, datamodule=datamodule)
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     num_workers = 20
 
     gamma_min=-13.3
-    gamma_max= 5.0
+    gamma_max= 13.3
     embedding_dim= 48
     norm_groups= 8
     n_blocks= 4
@@ -60,6 +60,10 @@ if __name__ == "__main__":
         batch_size=batch_size,
         stage="fit",
     )
+    def draw_figure(*args):
+        return utils.draw_figure(*args,input_pk=False,names=["m_star_z=0.0","m_cdm_z=0.0"],unnormalize=True,
+        func_unnorm_input=camels2D_256_CV_CV_z_dataset.unnormalize_input,
+        func_unnorm_target=camels2D_256_CV_CV_z_dataset.unnormalize_target)
     vdm = vdm_model3.LightVDM(
         score_model=networks.UNet4VDM(
             gamma_min=gamma_min,
@@ -72,6 +76,6 @@ if __name__ == "__main__":
         gamma_max=gamma_max,
         image_shape=(1, cropsize,cropsize),
         noise_schedule = "learned_linear",
-        draw_figure=utils.draw_figure,
+        draw_figure=draw_figure,
     )
     train(model=vdm, datamodule=dm)
