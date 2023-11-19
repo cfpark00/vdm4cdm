@@ -7,7 +7,7 @@ from lightning.pytorch.callbacks import LearningRateMonitor,ModelCheckpoint
 
 #custom
 from dataset import camels2D_256_CV_CV_z_dataset
-from model import vdm_model3,networks
+from model import vdm_model,networks
 from utils import utils
 
 #preamble
@@ -64,7 +64,7 @@ if __name__ == "__main__":
         return utils.draw_figure(*args,input_pk=False,names=["m_star_z=0.0","m_cdm_z=0.0"],unnormalize=True,
         func_unnorm_input=camels2D_256_CV_CV_z_dataset.unnormalize_input,
         func_unnorm_target=camels2D_256_CV_CV_z_dataset.unnormalize_target)
-    vdm = vdm_model3.LightVDM(
+    vdm = vdm_model.LightVDM(
         score_model=networks.UNet4VDM(
             gamma_min=gamma_min,
             gamma_max=gamma_max,

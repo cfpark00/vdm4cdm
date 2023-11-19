@@ -8,7 +8,7 @@ from torch.special import expm1
 from tqdm import trange
 from torch.distributions.normal import Normal
 from lightning.pytorch import LightningModule
-from .nn_tools import FixedLinearSchedule, LearnedLinearSchedule, NNSchedule, kl_std_normal
+from .nn_tools import FixedLinearSchedule, LearnedLinearSchedule, NNSchedule, SigmoidSchedule, kl_std_normal
 
 class VDM(nn.Module):
     def __init__(
@@ -24,7 +24,7 @@ class VDM(nn.Module):
             128,
         ),
         data_noise: float = 1.0e-3,
-        lambdas: Tuple[float] = (1.0, 1.0, 1.0),
+        lambdas=None,
     ):
         """Variational diffusion model, continuous time implementation of arxiv:2107.00630.
 
@@ -50,14 +50,20 @@ class VDM(nn.Module):
         if noise_schedule == "fixed_linear":
             self.gamma = FixedLinearSchedule(gamma_min, gamma_max)
         elif noise_schedule == "learned_linear":
-            print("LEARNED LINEAR")
             self.gamma = LearnedLinearSchedule(gamma_min, gamma_max)
         elif noise_schedule == "learned_nn":
             self.gamma = NNSchedule(gamma_min, gamma_max)
+        elif noise_schedule == "learned_nn2":
+            self.gamma = NNSchedule(gamma_min, gamma_max,setting=2)
+        elif noise_schedule == "sigmoid":
+            self.gamma = SigmoidSchedule(gamma_min, gamma_max)
         else:
             raise ValueError(f"Unknown noise schedule {noise_schedule}")
         self.antithetic_time_sampling = antithetic_time_sampling
-        self.lambdas = lambdas
+        if lambdas is None:
+            self.lambdas=(1.0,1.0,1.0)
+        else:
+            self.lambdas=lambdas
 
     def variance_preserving_map(
         self, x: Tensor, times: Tensor, noise: Optional[Tensor] = None
@@ -80,6 +86,17 @@ class VDM(nn.Module):
         if noise is None:
             noise = torch.randn_like(x)
         return alpha * x + noise * scale, gamma_t
+
+    def sample_zt_given_zs(self,zs,s,t):
+        gamma_t = self.gamma(t)
+        gamma_s = self.gamma(s)
+        alpha_t = self.alpha(gamma_t)
+        alpha_s = self.alpha(gamma_s)
+        sigma_t = self.sigma(gamma_t)
+        sigma_s = self.sigma(gamma_s)
+        alpha_ts=alpha_t/alpha_s
+        sigma_ts_sq=sigma_t**2-(alpha_ts**2)*(sigma_s**2)
+        return alpha_ts*zs+torch.sqrt(sigma_ts_sq)*torch.randn_like(zs)
 
     def sample_times(
         self,
@@ -151,20 +168,20 @@ class VDM(nn.Module):
         return bpd_factor * kl_std_normal(mean_sq, sigma_1_sq).flatten(start_dim=1).sum(
             axis=-1
         )
-    """
+
     def get_reconstruction_loss(
         self,
         x: Tensor,
         bpd_factor: float,
     ):
-        """"""Measure reconstruction error
+        """Measure reconstruction error
 
         Args:
             x (Tensor): data sample
 
         Returns:
             float: reconstruction loss
-        """"""
+        """
         noise_0 = torch.randn_like(x)
         times = torch.tensor([0.0], device=x.device)
         z_0, gamma_0 = self.variance_preserving_map(
@@ -175,13 +192,14 @@ class VDM(nn.Module):
         # Generate a sample for z_0 -> closest to the data
         alpha_0 = torch.sqrt(torch.sigmoid(-gamma_0))
         z_0_rescaled = z_0 / alpha_0
-        return bpd_factor * Normal(loc=z_0_rescaled, scale=self.data_noise).log_prob(x).flatten(start_dim=1).sum(axis=-1)
-    """
+        return -bpd_factor * Normal(loc=z_0_rescaled, scale=self.data_noise).log_prob(x).flatten(start_dim=1).sum(axis=-1)
+
     def get_loss(
         self,
         x: Tensor,
         conditioning: Optional[Tensor] = None,
-        noise: Optional[Tensor] = None
+        noise: Optional[Tensor] = None,
+        conditioning_values=None,
     ) -> float:
         """Get loss for diffusion model. Eq. 11 in arxiv:2107.00630
 
@@ -207,6 +225,7 @@ class VDM(nn.Module):
             x_t,
             conditioning=conditioning,
             g_t=gamma_t.squeeze(),
+            conditioning_values=conditioning_values,
         )
 
         # *** Diffusion loss
@@ -223,22 +242,22 @@ class VDM(nn.Module):
             x=x,
             bpd_factor=bpd_factor,
         )*(self.lambdas[1] if self.lambdas is not None else 1)
-        """
+        
         # *** Reconstruction loss:  - E_{q(z_0 | x)} [log p(x | z_0)].
         recons_loss = self.get_reconstruction_loss(
             x=x,
             bpd_factor=bpd_factor,
         )*(self.lambdas[2] if self.lambdas is not None else 1)
-        """
+        
 
         # *** Overall loss, Shape (B, ).
-        loss = diffusion_loss + latent_loss# + recons_loss
+        loss = diffusion_loss + latent_loss + recons_loss
 
         metrics = {
             "elbo": loss.mean(),
             "diffusion_loss": diffusion_loss.mean(),
             "latent_loss": latent_loss.mean(),
-            #"reconstruction_loss": recons_loss.mean(),
+            "reconstruction_loss": recons_loss.mean(),
         }
         return loss.mean(), metrics
 
@@ -270,6 +289,8 @@ class VDM(nn.Module):
         conditioning: Tensor,
         t: Tensor,
         s: Tensor,
+        conditioning_values=None,
+        return_ddnm=False,
     ) -> Tensor:
         """Sample p(z_s|z_t, x) used for standard ancestral sampling. Eq. 34 in arxiv:2107.00630
 
@@ -293,10 +314,24 @@ class VDM(nn.Module):
             zt,
             conditioning=conditioning,
             g_t=gamma_t,
+            conditioning_values=conditioning_values,
         )
-        mean = alpha_s / alpha_t * (zt - c * sigma_t * pred_noise)
-        scale = sigma_s * torch.sqrt(c)
-        return mean + scale * torch.randn_like(zt)
+        if not return_ddnm:
+            mean = alpha_s / alpha_t * (zt - c * sigma_t * pred_noise)
+            scale = sigma_s * torch.sqrt(c)
+            return mean + scale * torch.randn_like(zt)
+        else:
+            gamma_0 = self.gamma(torch.tensor([0.0], device=zt.device))
+            alpha_0 = self.alpha(gamma_0)
+            sigma_0 = self.sigma(gamma_0)
+            c0 = -expm1(gamma_0 - gamma_t)
+            x_0t = alpha_0 / alpha_t * (zt - c0 * sigma_t * pred_noise)
+            alpha_ts=alpha_t/alpha_s
+            sigma_ts_sq=sigma_t**2-(alpha_ts**2)*(sigma_s**2)
+            w_z=alpha_ts*(sigma_s/sigma_t)**2
+            w_x_0t=alpha_s*sigma_ts_sq/(sigma_t)**2
+            scale=torch.sqrt(sigma_ts_sq*(sigma_s/sigma_t)**2)
+            return w_z,w_x_0t, x_0t,scale
 
     @torch.no_grad()
     def sample(
@@ -305,6 +340,7 @@ class VDM(nn.Module):
         batch_size: int,
         n_sampling_steps: int,
         device: str,
+        conditioning_values=None,
         z: Optional[Tensor] = None,
         return_all=False,
         verbose=False
@@ -340,6 +376,7 @@ class VDM(nn.Module):
                 conditioning=conditioning,
                 t=steps[i],
                 s=steps[i + 1],
+                conditioning_values=conditioning_values,
             )
             if return_all:
                 zs.append(z)
@@ -355,11 +392,12 @@ class LightVDM(LightningModule):
         weight_decay: float = 1.0e-5,
         n_sampling_steps: int = 250,
         image_shape: Tuple[int] = (1, 128, 128),
-        gamma_min: float = -12.5,
-        gamma_max: float = 5.5,
-        #gamma_min_max: float = -9.0,
-        #gamma_max_min: float = 4.0,
+        conditioning_values=0,
+        gamma_min: float = -13.3,
+        gamma_max: float = 5.0,
+        lambdas=None,
         draw_figure=None,
+        ignore_conditioning=False,
         **kwargs
     ):
         """Variational diffusion wrapper for lightning
@@ -372,12 +410,13 @@ class LightVDM(LightningModule):
         """
         super().__init__()
         self.save_hyperparameters(ignore=["score_model","draw_figure"])
+        self.conditioning_values=conditioning_values
+        self.ignore_conditioning=ignore_conditioning
         self.model = VDM(
             score_model=score_model,
             gamma_min=gamma_min,
             gamma_max=gamma_max,
-            #gamma_min_max=gamma_min_max,
-            #gamma_max_min=gamma_max_min,
+            lambdas=lambdas,
             image_shape=image_shape,
             **kwargs
         )
@@ -388,7 +427,7 @@ class LightVDM(LightningModule):
                 return fig
             self.draw_figure=draw_figure
 
-    def forward(self, x: Tensor, conditioning: Tensor) -> Tensor:
+    def forward(self, x: Tensor, conditioning: Tensor, conditioning_values=None) -> Tensor:
         """get loss for samples
 
         Args:
@@ -398,7 +437,9 @@ class LightVDM(LightningModule):
         Returns:
             Tensor: loss
         """
-        return self.model.get_loss(x=x, conditioning=conditioning)
+        if self.ignore_conditioning:
+            conditioning=None
+        return self.model.get_loss(x=x, conditioning=conditioning,conditioning_values=conditioning_values)
 
     def evaluate(self, batch: Tuple, stage: str = None) -> Tensor:
         """get loss function
@@ -410,8 +451,14 @@ class LightVDM(LightningModule):
         Returns:
             Tensor: loss function
         """
-        conditioning, x = batch
-        loss, metrics = self(x=x, conditioning=conditioning)
+        if self.conditioning_values>0:
+            conditioning, x, conditioning_values = batch
+        else:
+            conditioning, x = batch
+            conditioning_values=None
+        if self.ignore_conditioning:
+            conditioning=None
+        loss, metrics = self(x=x, conditioning=conditioning,conditioning_values=conditioning_values)
         if self.logger is not None:
             self.logger.log_metrics(metrics)
         return loss
@@ -437,6 +484,7 @@ class LightVDM(LightningModule):
         conditioning: Tensor,
         batch_size: int,
         n_sampling_steps: int,
+        conditioning_values=None,
         verbose=False,
         return_all=False
     ) -> Tensor:
@@ -451,11 +499,14 @@ class LightVDM(LightningModule):
         Returns:
             Tensor: generated samples
         """
+        if self.ignore_conditioning:
+            conditioning=None
         return self.model.sample(
             conditioning=conditioning,
             batch_size=batch_size,
             n_sampling_steps=n_sampling_steps,
-            device=conditioning.device,
+            device=self.device,
+            conditioning_values=conditioning_values,
             verbose=verbose,
             return_all=return_all
         )
@@ -471,7 +522,13 @@ class LightVDM(LightningModule):
             Tensor: loss
         """
         # sample images during validation and upload to wandb
-        conditioning, x = batch
+        if self.conditioning_values>0:
+            conditioning, x, conditioning_values = batch
+        else:
+            conditioning, x = batch
+            conditioning_values=None
+        if self.ignore_conditioning:
+            conditioning=None
         loss = self.evaluate(batch, "val")
         self.log_dict({'val_loss': loss})
         
@@ -480,8 +537,12 @@ class LightVDM(LightningModule):
                 conditioning=conditioning,
                 batch_size=len(x),
                 n_sampling_steps=self.hparams.n_sampling_steps,
+                conditioning_values=conditioning_values,
             )
-            fig=self.draw_figure(x,sample,conditioning)
+            if conditioning_values is not None:
+                fig=self.draw_figure(x,sample,conditioning,conditioning_values=conditioning_values)
+            else:
+                fig=self.draw_figure(x,sample,conditioning)
             
             if self.logger is not None:
                 self.logger.experiment.log_figure(figure=fig)
