@@ -22,7 +22,7 @@ def train(
         save_dir="./data/comet_logs/",
         api_key=os.environ.get("COMET_API_KEY"),
         project_name="Mstar2Mcdm-2D-new",
-        experiment_name="LH",
+        experiment_name="LH_11_19_2",
     )
     trainer = Trainer(
         logger=comet_logger,

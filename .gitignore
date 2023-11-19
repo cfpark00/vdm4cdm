@@ -2,5 +2,5 @@ analysis/*
 slurm_run/*
 train_scripts/*
 train_script_archive/*
-
+inpainting/*
 
