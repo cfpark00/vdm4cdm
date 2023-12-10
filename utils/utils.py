@@ -8,6 +8,7 @@ import warnings
 import scipy.interpolate as sintp
 import scipy.stats as sstats
 import scipy.optimize as sopt
+import scipy.ndimage as sim
 
 #import sys
 #sys.path.append("../")
@@ -373,3 +374,27 @@ def get_gpr_result(x_uk,x_k,y_k,cov_func,n_samples=24,verbose=0,reg_diag=0.,reg_
         warnings.simplefilter("ignore")
         post_draws=np.random.multivariate_normal(post_mean,post_cov,size=n_samples)
     return post_mean,post_var,post_draws
+
+def get_smooth_mask_boundary(mask,sigma=3):
+    smooth_mask=sim.gaussian_filter(mask.astype(np.float32),sigma=sigma)
+    mask_sobel_x=sim.sobel(smooth_mask,axis=0)
+    mask_sobel_y=sim.sobel(smooth_mask,axis=1)
+    mask_sobel_vec=np.stack([mask_sobel_x,mask_sobel_y],axis=-1)
+    smooth_mask_boundary=np.linalg.norm(mask_sobel_vec,axis=-1)
+    return smooth_mask,smooth_mask_boundary
+
+def get_smoothness(field,weight,return_maps=False,gradient=True):
+    if gradient:
+        sobel_x_field=sim.sobel(field,axis=0)
+        sobel_y_field=sim.sobel(field,axis=1)
+        in_field=np.linalg.norm(np.stack([sobel_x_field,sobel_y_field],axis=-1),axis=-1)
+    else:
+        in_field=field.copy()
+    cc=np.fft.ifftn(np.fft.fftn(in_field)*np.fft.fftn(weight))
+    maximag=np.max(np.abs(cc.imag))
+    assert maximag<1e-8,f"cc.imag not close to 0: {maximag}"
+    cc=cc.real
+    z=(cc-cc.mean())/cc.std(ddof=1)
+    if return_maps:
+        return z,in_field,cc
+    return z
