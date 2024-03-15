@@ -166,7 +166,7 @@ class UNet4VDM(nn.Module):#n_channels increasing by *2
         conditioning_channels: int = 1,
         conditioning_values: int = 0,
         cond_value_mode="comb",#"comb" or "sep"
-        cond_proj_bias=True,
+        cond_proj_bias=False,
         embedding_dim: int=32,
         emb_mult_t=4,
         n_blocks: int = 4,  

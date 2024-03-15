@@ -91,14 +91,34 @@ def power(x,x2=None):
 
     return k, P, N
 
-def pk(fields):
+def pk(fields,fields2=None):
     kss,pkss,nss = [],[],[]
-    for field in fields:
-        ks,pks,ns = power(field[None])#add 1 batch
-        kss.append(ks)
-        pkss.append(pks)
-        nss.append(ns)
+    if fields2 is not None:
+        for field,field2 in zip(fields,fields2):
+            ks,pks,ns = power(field[None],field2[None])#add 1 batch
+            kss.append(ks)
+            pkss.append(pks)
+            nss.append(ns)
+    else:
+        for field in fields:
+            ks,pks,ns = power(field[None])
+            kss.append(ks)
+            pkss.append(pks)
+            nss.append(ns)
     return torch.stack(kss,dim=0),torch.stack(pkss,dim=0),torch.stack(nss,dim=0)
+
+def pk_with_units(fields,fields2=None,boxsize=25,single_kss=True,to_numpy=True):
+    k_conversion = 2*np.pi/boxsize
+    assert len(fields.shape) == 4
+    kss,pkss,nss=pk(fields,fields2=fields2)
+    kss *= k_conversion
+    pkss *= boxsize**2
+    if single_kss:
+        kss=kss[0]
+    if to_numpy:
+        kss=to_np(kss)
+        pkss=to_np(pkss)
+    return kss, pkss
 
 def draw_figure(x,sample,conditioning=None,
 input_pk=False,names=["m_star","m_cdm"],vmMs=[[-4,4],[-4,4]],unnormalize=False,
