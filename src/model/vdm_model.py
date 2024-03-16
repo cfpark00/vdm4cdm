@@ -18,13 +18,8 @@ class VDM(nn.Module):
         gamma_min: float = -13.3,
         gamma_max: float = 5.0,
         antithetic_time_sampling: bool = True,
-        image_shape: Tuple[int] = (
-            1,
-            128,
-            128,
-        ),
+        image_shape: Tuple[int] = (1,256,256,),
         data_noise: float = 1.0e-3,
-        lambdas=None,
     ):
         """Variational diffusion model, continuous time implementation of arxiv:2107.00630.
 
@@ -60,10 +55,6 @@ class VDM(nn.Module):
         else:
             raise ValueError(f"Unknown noise schedule {noise_schedule}")
         self.antithetic_time_sampling = antithetic_time_sampling
-        if lambdas is None:
-            self.lambdas=(1.0,1.0,1.0)
-        else:
-            self.lambdas=lambdas
 
     def variance_preserving_map(
         self, x: Tensor, times: Tensor, noise: Optional[Tensor] = None
@@ -87,7 +78,7 @@ class VDM(nn.Module):
             noise = torch.randn_like(x)
         return alpha * x + noise * scale, gamma_t
 
-    def sample_zt_given_zs(self,zs,s,t):
+    def sample_zt_given_zs(self,zs,s,t,pos_mean=False):
         gamma_t = self.gamma(t)
         gamma_s = self.gamma(s)
         alpha_t = self.alpha(gamma_t)
@@ -96,6 +87,8 @@ class VDM(nn.Module):
         sigma_s = self.sigma(gamma_s)
         alpha_ts=alpha_t/alpha_s
         sigma_ts_sq=sigma_t**2-(alpha_ts**2)*(sigma_s**2)
+        if pos_mean:
+            return alpha_ts*zs
         return alpha_ts*zs+torch.sqrt(sigma_ts_sq)*torch.randn_like(zs)
 
     def sample_times(
@@ -235,19 +228,19 @@ class VDM(nn.Module):
             pred_noise=pred_noise,
             noise=noise,
             bpd_factor=bpd_factor,
-        )*(self.lambdas[0] if self.lambdas is not None else 1)
+        )
 
         # *** Latent loss: KL divergence from N(0, 1) to q(z_1 | x)
         latent_loss = self.get_latent_loss(
             x=x,
             bpd_factor=bpd_factor,
-        )*(self.lambdas[1] if self.lambdas is not None else 1)
+        )
         
         # *** Reconstruction loss:  - E_{q(z_0 | x)} [log p(x | z_0)].
         recons_loss = self.get_reconstruction_loss(
             x=x,
             bpd_factor=bpd_factor,
-        )*(self.lambdas[2] if self.lambdas is not None else 1)
+        )
         
 
         # *** Overall loss, Shape (B, ).
@@ -286,9 +279,9 @@ class VDM(nn.Module):
     def sample_zs_given_zt(
         self,
         zt: Tensor,
-        conditioning: Tensor,
         t: Tensor,
         s: Tensor,
+        conditioning: Optional[Tensor] = None,
         conditioning_values=None,
         return_ddnm=False,
     ) -> Tensor:
@@ -336,11 +329,11 @@ class VDM(nn.Module):
     @torch.no_grad()
     def sample(
         self,
-        conditioning: Tensor,
         batch_size: int,
         n_sampling_steps: int,
         device: str,
-        conditioning_values=None,
+        conditioning: Optional[Tensor] = None,
+        conditioning_values: Optional[Tensor] =None,
         z: Optional[Tensor] = None,
         return_all=False,
         verbose=False
@@ -391,13 +384,12 @@ class LightVDM(LightningModule):
         learning_rate: float = 3.0e-4,
         weight_decay: float = 1.0e-5,
         n_sampling_steps: int = 250,
-        image_shape: Tuple[int] = (1, 128, 128),
+        image_shape: Tuple[int] = (1, 256, 256),
         conditioning_values=0,
+        conditioning_channels=0,
         gamma_min: float = -13.3,
-        gamma_max: float = 5.0,
-        lambdas=None,
+        gamma_max: float = 13.3,
         draw_figure=None,
-        ignore_conditioning=False,
         **kwargs
     ):
         """Variational diffusion wrapper for lightning
@@ -411,35 +403,33 @@ class LightVDM(LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=["score_model","draw_figure"])
         self.conditioning_values=conditioning_values
-        self.ignore_conditioning=ignore_conditioning
+        self.conditioning_channels=conditioning_channels
         self.model = VDM(
             score_model=score_model,
             gamma_min=gamma_min,
             gamma_max=gamma_max,
-            lambdas=lambdas,
             image_shape=image_shape,
             **kwargs
         )
         self.draw_figure=draw_figure
         if self.draw_figure is None:
-            def draw_figure(args,**kwargs):
+            def draw_figure(*args,**kwargs):
                 fig=plt.figure(figsize=(5,5))
                 return fig
             self.draw_figure=draw_figure
 
-    def forward(self, x: Tensor, conditioning: Tensor, conditioning_values=None) -> Tensor:
+    def forward(self, x: Tensor, conditioning: Tensor = None, conditioning_values: Tensor = None) -> Tensor:
         """get loss for samples
 
         Args:
             x (Tensor): data samples
             conditioning (Tensor): conditioning
+            conditioning_values (Tensor): conditioning_values
 
         Returns:
             Tensor: loss
         """
-        if self.ignore_conditioning:
-            conditioning=None
-        return self.model.get_loss(x=x, conditioning=conditioning,conditioning_values=conditioning_values)
+        return self.model.get_loss(x=x, conditioning=conditioning, conditioning_values=conditioning_values)
 
     def evaluate(self, batch: Tuple, stage: str = None) -> Tensor:
         """get loss function
@@ -451,14 +441,7 @@ class LightVDM(LightningModule):
         Returns:
             Tensor: loss function
         """
-        if self.conditioning_values>0:
-            conditioning, x, conditioning_values = batch
-        else:
-            conditioning, x = batch
-            conditioning_values=None
-        if self.ignore_conditioning:
-            conditioning=None
-        loss, metrics = self(x=x, conditioning=conditioning,conditioning_values=conditioning_values)
+        loss, metrics = self(x=batch["x"],conditioning=batch["conditioning"],conditioning_values=batch["conditioning_values"])
         if self.logger is not None:
             self.logger.log_metrics(metrics)
         return loss
@@ -481,17 +464,16 @@ class LightVDM(LightningModule):
 
     def draw_samples(
         self,
-        conditioning: Tensor,
         batch_size: int,
-        n_sampling_steps: int,
-        conditioning_values=None,
+        n_sampling_steps: int=250,
+        conditioning: Optional[Tensor] = None,
+        conditioning_values: Optional[Tensor] =None,
         verbose=False,
         return_all=False
     ) -> Tensor:
         """draw samples from model
 
         Args:
-            conditioning (Tensor): conditioning
             batch_size (int): number of samples in batch
             n_sampling_steps (int): number of sampling steps used to generate validation
             samples
@@ -499,13 +481,11 @@ class LightVDM(LightningModule):
         Returns:
             Tensor: generated samples
         """
-        if self.ignore_conditioning:
-            conditioning=None
-        return self.model.sample(
-            conditioning=conditioning,
-            batch_size=batch_size,
+
+        return self.model.sample(batch_size=batch_size,
             n_sampling_steps=n_sampling_steps,
             device=self.device,
+            conditioning=conditioning,
             conditioning_values=conditioning_values,
             verbose=verbose,
             return_all=return_all
@@ -522,27 +502,20 @@ class LightVDM(LightningModule):
             Tensor: loss
         """
         # sample images during validation and upload to wandb
-        if self.conditioning_values>0:
-            conditioning, x, conditioning_values = batch
-        else:
-            conditioning, x = batch
-            conditioning_values=None
-        if self.ignore_conditioning:
-            conditioning=None
+        x=batch["x"]
+        conditioning=batch["conditioning"]
+        conditioning_values=batch["conditioning_values"]
         loss = self.evaluate(batch, "val")
         self.log_dict({'val_loss': loss})
         
         if batch_idx == 0:
             sample = self.draw_samples(
-                conditioning=conditioning,
                 batch_size=len(x),
                 n_sampling_steps=self.hparams.n_sampling_steps,
+                conditioning=conditioning,
                 conditioning_values=conditioning_values,
             )
-            if conditioning_values is not None:
-                fig=self.draw_figure(x,sample,conditioning,conditioning_values=conditioning_values)
-            else:
-                fig=self.draw_figure(x,sample,conditioning)
+            fig=self.draw_figure(x,sample,conditioning=conditioning, conditioning_values=conditioning_values)
             
             if self.logger is not None:
                 self.logger.experiment.log_figure(figure=fig)

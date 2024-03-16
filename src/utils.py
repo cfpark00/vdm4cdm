@@ -12,8 +12,8 @@ import scipy.ndimage as sim
 
 #import sys
 #sys.path.append("../")
-from model import vdm_model,vdm_model_inpaint
-from model import networks
+from .model import vdm_model
+from .model import networks
 
 def to_np(ten):
     return ten.detach().cpu().numpy()
@@ -294,7 +294,6 @@ def get_old_state_dict(state_dict,verbose=0):#cond_proj layers changed
             new_state_dict[key]=value
     return new_state_dict
 
-
 def get_ddnm_result(vdm,y,A,AT,n_sampling_steps=250,l=10,return_all=False,verbose=0,**kwargs):#,pos_mean=False
     if not isinstance(l,np.ndarray):
         if isinstance(l,int):
@@ -418,3 +417,26 @@ def get_smoothness(field,weight,return_maps=False,gradient=True):
     if return_maps:
         return z,in_field,cc
     return z
+
+def unnormalize(x,mean,std):
+    return x*std+mean
+
+def normalize(x,mean,std):
+    return (x-mean)/std
+
+def get_ccs(fields1,fields2,full=False):
+    pks1=pk(fields1)[1]
+    pks2=pk(fields2)[1]
+    n=len(fields2)
+    if full:
+        ccs=[]
+        for field1 in fields1:
+            _,ccs_,_=pk(field1[None].repeat(n,1,1,1),fields2=fields2)
+            ccs.append(ccs_)
+        ccs=torch.stack(ccs,dim=0)
+        ccs=ccs/torch.sqrt(pks1[:,None]*pks2[None,:])
+    else:
+        assert len(fields1)==len(fields2)
+        _,ccs,_=pk(fields1,fields2=fields2)
+        ccs=ccs/torch.sqrt(pks1*pks2)
+    return ccs

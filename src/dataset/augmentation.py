@@ -5,54 +5,40 @@ import torchvision.transforms.functional as F
 from torchvision.transforms import Resize as VisionResize
 
 
-class Normalize(torch.nn.Module):
-    def __init__(
-        self,
-        mean_input,
-        std_input,
-        mean_target,
-        std_target,
-    ):
+class LogTransform(torch.nn.Module):
+    def __init__(self,alphas):
         super().__init__()
-        self.mean_input = mean_input
-        self.std_input = std_input
-        self.mean_target = mean_target
-        self.std_target = std_target
+        self.alphas = alphas
 
     def forward(
         self,
         sample: Tensor,
     ) -> Tensor:
-        conditioning, target = sample
-        transformed_conditioning = F.normalize(
-            conditioning,
-            self.mean_input,
-            self.std_input,
-        )
-        transformed_target = F.normalize(
-            target,
-            self.mean_target,
-            self.std_target,
-        )
-        return transformed_conditioning, transformed_target
+        ims = []
+        for img,alpha in zip(sample,self.alphas):
+            img = torch.log10(img + alpha)
+            ims.append(img)
+        return ims
 
-"""
-class Resize(torch.nn.Module):
+class Normalize(torch.nn.Module):
     def __init__(
         self,
-        size=(32, 32),
+        means,
+        stds
     ):
         super().__init__()
-        self.size = size
-        self.resize = VisionResize(
-            size,
-            antialias=True,
-        )
+        self.means = means
+        self.stds = stds
 
-    def forward(self, sample: Tensor) -> Tensor:
-        conditioning, target = sample
-        return self.resize(conditioning), self.resize(target)
-"""
+    def forward(
+        self,
+        sample: Tensor,
+    ) -> Tensor:
+        ims = []
+        for img, mean, std in zip(sample, self.means, self.stds):
+            img = F.normalize(img, mean, std)
+            ims.append(img)
+        return ims
 
 
 class Translate(object):
@@ -67,15 +53,14 @@ class Translate(object):
 
             return in_img,
         else:
-            in_img, tgt_img = sample  # (C, H, W)
-
-            x_shift = torch.randint(in_img.shape[-2], (1,)).item()
-            y_shift = torch.randint(in_img.shape[-1], (1,)).item()
-
-            in_img = torch.roll(in_img, (x_shift, y_shift), dims=(-2, -1))
-            tgt_img = torch.roll(tgt_img, (x_shift, y_shift), dims=(-2, -1))
-
-            return in_img, tgt_img
+            img=sample[0]
+            x_shift = torch.randint(img.shape[-2], (1,)).item()
+            y_shift = torch.randint(img.shape[-1], (1,)).item()
+            ims=[]
+            for img in sample:
+                img = torch.roll(img, (x_shift, y_shift), dims=(-2, -1))
+                ims.append(img)
+            return ims
 
 class Translate3D(object):
     def __call__(self, sample):
@@ -90,16 +75,16 @@ class Translate3D(object):
 
             return in_img,
         else:
-            in_img, tgt_img = sample  # (C, H, W, D)
+            img=sample[0]
+            x_shift = torch.randint(img.shape[-3], (1,)).item()
+            y_shift = torch.randint(img.shape[-2], (1,)).item()
+            z_shift = torch.randint(img.shape[-1], (1,)).item()
 
-            x_shift = torch.randint(in_img.shape[-3], (1,)).item()
-            y_shift = torch.randint(in_img.shape[-2], (1,)).item()
-            z_shift = torch.randint(in_img.shape[-1], (1,)).item()
-
-            in_img = torch.roll(in_img, (x_shift, y_shift, z_shift), dims=(-3, -2, -1))
-            tgt_img = torch.roll(tgt_img, (x_shift, y_shift, z_shift), dims=(-3, -2, -1))
-
-            return in_img, tgt_img
+            ims=[]
+            for img in sample:
+                img_ = torch.roll(img, (x_shift, y_shift, z_shift), dims=(-3, -2, -1))
+                ims.append(img_)
+            return ims
 
 class Flip(object):
     def __init__(self, ndim):
@@ -123,21 +108,14 @@ class Flip(object):
 
             return in_img,
         else:
-            in_img, tgt_img = sample
-
-            if in_img.shape[0] == self.ndim:  # flip vector components
-                in_img[self.axes] = -in_img[self.axes]
-
-            shifted_axes = (1 + self.axes).tolist()
-            in_img = torch.flip(in_img, shifted_axes)
-
-            if tgt_img.shape[0] == self.ndim:  # flip vector components
-                tgt_img[self.axes] = -tgt_img[self.axes]
-
-            shifted_axes = (1 + self.axes).tolist()
-            tgt_img = torch.flip(tgt_img, shifted_axes)
-
-            return in_img, tgt_img
+            ims=[]
+            for img in sample:
+                if img.shape[0] == self.ndim:
+                    img[self.axes] = -img[self.axes]
+                shifted_axes = (1 + self.axes).tolist()
+                img = torch.flip(img, shifted_axes)
+                ims.append(img)
+            return ims
 
 
 class Permutate(object):
@@ -160,21 +138,14 @@ class Permutate(object):
 
             return in_img,
         else:
-            in_img, tgt_img = sample
-
-            if in_img.shape[0] == self.ndim:  # permutate vector components
-                in_img = in_img[self.axes]
-
-            shifted_axes = [0] + (1 + self.axes).tolist()
-            in_img = in_img.permute(shifted_axes)
-
-            if tgt_img.shape[0] == self.ndim:  # permutate vector components
-                tgt_img = tgt_img[self.axes]
-
-            shifted_axes = [0] + (1 + self.axes).tolist()
-            tgt_img = tgt_img.permute(shifted_axes)
-
-            return in_img, tgt_img
+            ims=[]
+            for img in sample:
+                if img.shape[0] == self.ndim:
+                    img = img[self.axes]
+                shifted_axes = [0] + (1 + self.axes).tolist()
+                img = img.permute(shifted_axes)
+                ims.append(img)
+            return ims
     
 
 class Crop(object):
@@ -226,9 +197,9 @@ class Crop(object):
             in_img = in_img[tuple(ind)]
             return in_img,
         else:
-            in_img, tgt_img = sample
-            
-            in_img = in_img[tuple(ind)]
-            tgt_img = tgt_img[tuple(ind)]
-            
-            return in_img, tgt_img
+            ims = []
+            for img in sample:
+                ims.append(img[tuple(ind)])
+            return ims
+        
+
