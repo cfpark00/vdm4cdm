@@ -509,13 +509,14 @@ class LightVDM(LightningModule):
         self.log_dict({'val_loss': loss})
         
         if batch_idx == 0:
-            sample = self.draw_samples(
+            print("Drawing samples")
+            samples = self.draw_samples(
                 batch_size=len(x),
                 n_sampling_steps=self.hparams.n_sampling_steps,
                 conditioning=conditioning,
                 conditioning_values=conditioning_values,
             )
-            fig=self.draw_figure(x,sample,conditioning=conditioning, conditioning_values=conditioning_values)
+            fig=self.draw_figure(batch, samples)
             
             if self.logger is not None:
                 self.logger.experiment.log_figure(figure=fig)

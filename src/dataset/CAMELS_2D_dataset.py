@@ -7,13 +7,13 @@ import json
 
 from .augmentation import Permutate, Flip, Normalize, Crop, LogTransform
 
-normalization_file = "./src/dataset/normalizations.json"
+normalization_file = "/n/home12/cfpark00/Diffusion/vdm4cdm_dev/vdm4cdm/src/dataset/normalizations.json"
 all_normalizations = json.load(open(normalization_file))
 
-data_source_file = "./src/dataset/data_source.json"
+data_source_file = "/n/home12/cfpark00/Diffusion/vdm4cdm_dev/vdm4cdm/src/dataset/data_source.json"
 data_source = json.load(open(data_source_file))
 
-alphas_file = "./src/dataset/alphas.json"
+alphas_file = "/n/home12/cfpark00/Diffusion/vdm4cdm_dev/vdm4cdm/src/dataset/alphas.json"
 all_alphas = json.load(open(alphas_file))
 
 class AstroDataset(Dataset):
@@ -51,22 +51,21 @@ class AstroDataset(Dataset):
         if self.do_crop:
             bidx, icrop = divmod(idx, self.ncrops)
             for field in self.fields:
-                fields.append(field[bidx])
+                fields.append(field[bidx].copy())
             for i in range(self.n_fields):
                 fields[i]=self.crop(fields[i], icrop)
             params=self.params[bidx]
         else:
             for field in self.fields:
-                fields.append(field[idx])
+                fields.append(field[idx].copy())
             params=self.params[idx]
         
         for i in range(self.n_fields):
-            fields[i]=torch.from_numpy(fields[i].copy()).to(torch.float32)
+            fields[i]=torch.from_numpy(fields[i]).to(torch.float32)
         params=torch.from_numpy(params).to(torch.float32)
         
         if self.transform is not None:
             fields = self.transform(fields)
-
         return self.return_func(fields=fields, params=params)
 
 
@@ -90,9 +89,9 @@ class AstroDataModule(LightningDataModule):
         self.alphas=[all_alphas[channel_name] for channel_name in channel_names]
         self.means=[all_normalizations[channel_name+"_m"] for channel_name in channel_names]
         self.stds=[all_normalizations[channel_name+"_s"] for channel_name in channel_names]
-        print(self.alphas)
-        print(self.means)
-        print(self.stds)
+        #print(self.alphas)
+        #print(self.means)
+        #print(self.stds)
         base_transform=transforms.Compose([LogTransform(self.alphas), Normalize(means=self.means,stds=self.stds)])
 
         if stage == "fit":
@@ -139,6 +138,18 @@ class AstroDataModule(LightningDataModule):
         else:
             raise ValueError(f"stage {stage} not recognized")
     
+    def unnorm_func(self,field,i_channel):
+        alpha=self.alphas[i_channel]
+        mean=self.means[i_channel]
+        std=self.stds[i_channel]
+        return 10**(field*std+mean)-alpha
+    
+    def norm_func(self,field,i_channel):
+        alpha=self.alphas[i_channel]
+        mean=self.means[i_channel]
+        std=self.stds[i_channel]
+        return (torch.log10(field+alpha)-mean)/std
+
     def collate_fn(self,batch):
         batched_data = {}
         b0=batch[0]
@@ -195,7 +206,7 @@ def get_dataset(
 
     if return_func is None:
         def return_func(fields,params):
-            return {"x":torch.cat(fields,dim=1),"conditioning":None,"conditioning_values":params}
+            return {"x":torch.cat(fields,dim=0),"conditioning":None,"conditioning_values":params}
 
     dm = AstroDataModule(
         selection=selection,

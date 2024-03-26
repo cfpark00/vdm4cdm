@@ -235,8 +235,10 @@ class UNet4VDM(nn.Module):#n_channels increasing by *2
         add_attention = True,
         n_attention_heads: int = 4,
         dropout_prob: float = 0.1,
+        verbose: int =0
     ):
         super().__init__()
+        self.verbose = verbose
         self.input_channels = input_channels
         self.embedding_dim = embedding_dim
         self.gamma_min = gamma_min
@@ -294,11 +296,12 @@ class UNet4VDM(nn.Module):#n_channels increasing by *2
             dim//=2
             self.up_blocks.append(UpBlock(resnet_block=ResnetBlock(ch_in=dim*2,ch_out=dim,**self.resnet_params)))
 
-        self.conv_out1 = nn.Sequential(
+        self.prep_conv_out1 = nn.Sequential(
             nn.GroupNorm(num_groups=norm_groups, num_channels=self.embedding_dim),
             nn.SiLU(),
-            nn.Conv2d(self.embedding_dim+self.conditioning_channels, self.embedding_dim, 3, padding=1,padding_mode="circular"),
         )
+        self.conv_out1=nn.Conv2d(self.embedding_dim+self.conditioning_channels, self.embedding_dim, 3, padding=1,padding_mode="circular")
+        
         self.conv_out2 = nn.Sequential(
             nn.GroupNorm(num_groups=norm_groups, num_channels=self.embedding_dim),
             nn.SiLU(),
@@ -306,6 +309,11 @@ class UNet4VDM(nn.Module):#n_channels increasing by *2
         )
 
     def forward(self,z,g_t,conditioning=None,conditioning_values=None):
+        if self.verbose>0:
+            print("z",z.shape)
+            print("g_t",g_t.shape)
+            print("conditioning",conditioning.shape if conditioning is not None else None)
+            print("conditioning_values",conditioning_values.shape if conditioning_values is not None else None)
         #concatenate conditioning
         if conditioning is not None:
             z_concat = torch.concat((z, conditioning),axis=1,)
@@ -347,6 +355,7 @@ class UNet4VDM(nn.Module):#n_channels increasing by *2
         for up_block in self.up_blocks:  # n_blocks times
             h = up_block(x=h,xskip=hs.pop(),conditionings=conditionings_)
             #print(h.shape)
+        h=self.prep_conv_out1(h)
         if conditioning is not None:
             h=torch.concat((h,conditioning),axis=1)
         h=self.conv_out1(h)

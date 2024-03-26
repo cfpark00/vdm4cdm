@@ -4,10 +4,14 @@ import torch
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.loggers import CometLogger
 from lightning.pytorch.callbacks import LearningRateMonitor,ModelCheckpoint
+import numpy as np
 
 #custom
+import mltools.models.vdm_model as vdm_model
+import mltools.networks.networks as networks
+import mltools.ml_utils as ml_utils
+
 from src.dataset import CAMELS_2D_dataset
-from src.model import vdm_model,networks
 from src import utils
 
 #preamble
@@ -21,7 +25,7 @@ def train(
         save_dir="./data/comet_logs/",
         api_key=os.environ.get("COMET_API_KEY"),
         project_name="vdm4cdm-2D-2024",
-        experiment_name="LH_03_16",
+        experiment_name="LH_c_uc_Mcdm",
     )
     trainer = Trainer(
         logger=comet_logger,
@@ -43,11 +47,11 @@ if __name__ == "__main__":
     
     #model
     input_channels=1
-    conditioning_channels = 0
+    conditioning_channels = 1
     conditioning_values = 0
+    chs=[48, 96, 192, 384]
     gamma_min = -13.3
     gamma_max = 13.3
-    embedding_dim = 48
     norm_groups = 8
     n_blocks = 4
     add_attention = True
@@ -60,45 +64,50 @@ if __name__ == "__main__":
     num_workers = 20
 
     def return_func(fields,params):
-        return {"x":torch.cat(fields,dim=1),"conditioning":None,"conditioning_values":None}
+        return {"x":fields[1],"conditioning":fields[0],"conditioning_values":None}
     dm = CAMELS_2D_dataset.get_dataset(
-        dataset_name="2df3d",
-        suite_name="IllustrisTNG",
+        dataset_name="CMD",
+        suite_name="Astrid",
         return_func=return_func,
         set_name="LH",
         z_name="z_0.00",
-        channel_names=["Mcdm"],
+        channel_names=["Mstar","Mcdm"],
         stage="fit",
         batch_size=batch_size,
         cropsize=cropsize,
         num_workers=num_workers,
         mmap=False
     )
-    #def draw_figure(*args,**kwargs):
-    #    return utils.draw_figure(*args,input_pk=False,names=["m_star_z=0.0","m_cdm_z=0.0"],unnormalize=True,
-    #    func_unnorm_input=camels2D_256_CV_CV_z_dataset.unnormalize_input,
-    #    func_unnorm_target=camels2D_256_CV_CV_z_dataset.unnormalize_target,**kwargs)
-    draw_figure=None
+
+    def draw_figure(batch,samples):
+        params={
+            "x_to_im": lambda x: np.clip(ml_utils.to_np(x[0]),-2,6),#single channel Mcdm
+            "conditioning_to_im": lambda x: ml_utils.to_np(x[0]),#single channel Mstar
+            "conditioning_values_to_str": None,#no conditioning_values
+            "pk_func": lambda f,i_channel: utils.pk_for_plot(dm.unnorm_func(f,i_channel)),
+            "cc_func": lambda f1,f2,i_channel: utils.cc_for_plot(dm.unnorm_func(f1,i_channel),dm.unnorm_func(f2,i_channel)),
+        }   
+        return utils.draw_figure(batch, samples, **params)
     
-    score_model=networks.UNet4VDM(
-            input_channels=1,
-            conditioning_channels=conditioning_channels,
-            conditioning_values=conditioning_values,
-            gamma_min=gamma_min,
-            gamma_max=gamma_max,
-            embedding_dim=embedding_dim,
-            norm_groups=norm_groups,
-            n_blocks=n_blocks,
-            add_attention=add_attention,
-            n_attention_heads=n_attention_heads,
-            dropout_prob=dropout_prob,
-            )
+    ####auto
+    shape=(input_channels, cropsize,cropsize)
+
+    score_model=networks.CUNet(
+        shape=shape,
+        chs=chs,
+        s_conditioning_channels =conditioning_channels,
+        v_conditioning_dims =[] if conditioning_values==0 else [conditioning_values],
+        t_conditioning=True,
+        norm_groups=norm_groups,
+        dropout_prob=dropout_prob,
+        conv_padding_mode = "circular",
+        )
     vdm=vdm_model.LightVDM(score_model=score_model,
+                           image_shape=shape,
                            gamma_min=gamma_min,
                            gamma_max=gamma_max,
-                           image_shape=(1, cropsize,cropsize),
-                            noise_schedule = "learned_linear",
-                            draw_figure=draw_figure,
-                            )
+                           noise_schedule = "learned_linear",
+                           draw_figure=draw_figure,
+                           )
 
     train(model=vdm, datamodule=dm)
