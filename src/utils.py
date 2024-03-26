@@ -15,13 +15,6 @@ import scipy.ndimage as sim
 from .model import vdm_model
 from .model import networks
 
-def to_np(ten):
-    return ten.detach().cpu().numpy()
-
-def kl_std_normal(mean_squared, var):
-    return 0.5 * (var + mean_squared - torch.log(var.clamp(min=1e-15)) - 1.0)
-
-
 def power(x,x2=None):
     """
     Parameters
@@ -92,6 +85,9 @@ def power(x,x2=None):
     return k, P, N
 
 def pk(fields,fields2=None):
+    """
+    summed over channel but returned batched
+    """
     kss,pkss,nss = [],[],[]
     if fields2 is not None:
         for field,field2 in zip(fields,fields2):
@@ -107,20 +103,16 @@ def pk(fields,fields2=None):
             nss.append(ns)
     return torch.stack(kss,dim=0),torch.stack(pkss,dim=0),torch.stack(nss,dim=0)
 
-def pk_with_units(fields,fields2=None,boxsize=25,single_kss=True,to_numpy=True):
+def pk_conversion(dim=2,boxsize=25):
+    assert dim==2,"check code before 3d!"
     k_conversion = 2*np.pi/boxsize
-    assert len(fields.shape) == 4
-    kss,pkss,nss=pk(fields,fields2=fields2)
-    kss *= k_conversion
-    pkss *= boxsize**2
-    if single_kss:
-        kss=kss[0]
-    if to_numpy:
-        kss=to_np(kss)
-        pkss=to_np(pkss)
-    return kss, pkss
+    pk_conversion = (boxsize**2)
+    return k_conversion,pk_conversion
 
 def get_ccs(fields1,fields2,full=False):
+    """
+    if full resturns cross correlation between all pairs of fields1 and fields2
+    """
     ks,pks1,_=pk(fields1)
     pks2=pk(fields2)[1]
     n=len(fields2)
@@ -137,13 +129,6 @@ def get_ccs(fields1,fields2,full=False):
         ccs=ccs/torch.sqrt(pks1*pks2)
     return ks,ccs
 
-def pk_for_plot(field):#field is no batch, no channel
-    ks,pks,ns = pk(field[None,None]/field.sum())
-    return to_np(ks[0]),to_np(pks[0])
-
-def cc_for_plot(field1,field2):#field is no batch, no channel
-    ks,ccs = get_ccs(field1[None,None]/field1.sum(),field2[None,None]/field2.sum(),full=False)
-    return to_np(ks[0]),to_np(ccs[0])
 
 def draw_figure(batch, samples,**kwargs):
     x = batch["x"]
@@ -217,181 +202,6 @@ def draw_figure(batch, samples,**kwargs):
         axes.flat[0].annotate(text, xy=(0, 0), xytext=(0.5, 0.5), textcoords='axes fraction', fontsize=params["fontsize"], ha='center', va='center')
         #fig.suptitle(title,fontsize=params["fontsize"])
     return fig
-
-
-def draw_figure_old(x,sample,conditioning=None,
-input_pk=False,names=["m_star","m_cdm"],vmMs=[[-4,4],[-4,4]],unnormalize=False,
-func_unnorm_input=None,func_norm_input=None,
-func_unnorm_target=None,func_norm_target=None,**kwargs):
-    fontsize=16
-    fig, axes = plt.subplots(2,3,figsize=(15,10))
-    if conditioning is not None:
-        axes.flat[0].imshow(to_np(conditioning[0,0,:,:]),vmin=vmMs[0][0],vmax=vmMs[0][1])
-    axes.flat[1].imshow(to_np(x[0,0,:,:]),vmin=vmMs[1][0],vmax=vmMs[1][1])
-    axes.flat[2].imshow(to_np(sample[0,0,:,:]),vmin=vmMs[1][0],vmax=vmMs[1][1])
-    axes.flat[0].set_title("GT "+names[0],fontsize=fontsize)
-    axes.flat[1].set_title("GT "+names[1],fontsize=fontsize)
-    axes.flat[2].set_title("Sampled "+names[1],fontsize=fontsize)
-    #--------
-    _ = axes.flat[3].hist(to_np(x[0,0]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='GT '+names[1])
-    _ = axes.flat[3].hist(to_np(sample[0,0]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='Sampled '+names[1])
-    if input_pk:
-        if conditioning is not None:
-            _ = axes.flat[3].hist(to_np(conditioning[0,0]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='GT '+names[0])
-    axes.flat[3].legend(fontsize=fontsize)
-    #--------
-    if unnormalize:
-        if conditioning is not None:
-            conditioning=func_unnorm_input(conditioning)
-        x=func_unnorm_target(x)
-        sample=func_unnorm_target(sample)
-    k,P,N = power(x[0:1])
-    axes.flat[4].plot(to_np(k),to_np(P),label='GT '+names[1])
-    k,P,N = power(sample[0:1])
-    axes.flat[4].plot(to_np(k),to_np(P),label='Sampled '+names[1])
-    if input_pk:
-        if conditioning is not None:
-            k,P,N = power(conditioning[0:1])
-            axes.flat[4].plot(to_np(k),to_np(P),label='GT '+names[0])
-    axes.flat[4].legend(fontsize=fontsize)
-    axes.flat[4].set_xscale('log')
-    axes.flat[4].set_yscale('log')
-    axes.flat[4].set_xlabel('k/k_grid',fontsize=fontsize)
-    axes.flat[4].set_ylabel('rawPk',fontsize=fontsize)
-    axes.flat[4].set_title("Powerspectrum",fontsize=fontsize)
-    if "conditioning_values" in kwargs.keys():
-        axes.flat[5].set_title(",".join([f"{p:.2f}" for p in to_np(kwargs["conditioning_values"][0])]))
-    return fig
-
-
-def draw_figure_3d(x,sample,conditioning,n_proj=32,
-input_pk=False,names=["m_star","m_cdm"],vmMs=[[-4,4],[-4,4]],unnormalize=False,
-func_unnorm_input=None,func_norm_input=None,
-func_unnorm_target=None,func_norm_target=None,**kwargs):
-    if func_unnorm_input is None:
-        func_unnorm_input=lambda x:x
-    if func_norm_input is None:
-        func_norm_input=lambda x:x
-    if func_unnorm_target is None:
-        func_unnorm_target=lambda x:x
-    if func_norm_target is None:
-        func_norm_target=lambda x:x
-    def get_im_input(x):
-        return to_np(func_norm_input(func_unnorm_input(x[0,0,:n_proj,:,:]).mean(0)))
-    def get_im_target(x):
-        return to_np(func_norm_target(func_unnorm_target(x[0,0,:n_proj,:,:]).mean(0)))
-    fontsize=16
-    fig, axes = plt.subplots(2,3,figsize=(15,10))
-    if conditioning is not None:
-        axes.flat[0].imshow(get_im_input(conditioning),vmin=vmMs[0][0],vmax=vmMs[0][1])
-    axes.flat[1].imshow(get_im_target(x),vmin=vmMs[0][0],vmax=vmMs[0][1])
-    axes.flat[2].imshow(get_im_target(sample),vmin=vmMs[0][0],vmax=vmMs[0][1])
-    axes.flat[0].set_title('GT '+names[0],fontsize=fontsize)
-    axes.flat[1].set_title('GT '+names[1],fontsize=fontsize)
-    axes.flat[2].set_title('Sampled '+names[1],fontsize=fontsize)
-    #--------
-    _ = axes.flat[3].hist(to_np(x[0,0]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='GT m_cdm')
-    _ = axes.flat[3].hist(to_np(sample[0,0]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='Sampled m_cdm')
-    axes.flat[3].legend(fontsize=fontsize)
-    #--------
-    if unnormalize:
-        if conditioning is not None:
-            conditioning=func_unnorm_input(conditioning)
-        x=func_unnorm_target(x)
-        sample=func_unnorm_target(sample)
-    k,P,N = power(x[0:1])
-    axes.flat[4].plot(to_np(k),to_np(P),label='GT '+names[1])
-    k,P,N = power(sample[0:1])
-    axes.flat[4].plot(to_np(k),to_np(P),label='Sampled '+names[1])
-    if input_pk:
-        if conditioning is not None:
-            k,P,N = power(conditioning[0:1])
-            axes.flat[4].plot(to_np(k),to_np(P),label='GT '+names[0])
-    axes.flat[4].legend(fontsize=fontsize)
-    axes.flat[4].set_xscale('log')
-    axes.flat[4].set_yscale('log')
-    axes.flat[4].set_xlabel('k/k_grid',fontsize=fontsize)
-    axes.flat[4].set_ylabel('rawPk',fontsize=fontsize)
-    axes.flat[4].set_title("Powerspectrum",fontsize=fontsize)
-    if "conditioning_values" in kwargs.keys():
-        axes.flat[5].set_title(",".join([f"{p:.2f}" for p in to_np(kwargs["conditioning_values"][0])]))
-    return fig
-
-def unnorm_proj_norm(field,norm_func,unnorm_func,start=0,n_proj=32,axis=0):
-    ndim=field.ndim
-    unnorm_field=unnorm_func(field)
-    #projection through axis
-    sl=tuple([slice(None) if i!=axis else slice(start,start+n_proj) for i in range(ndim)])
-    unnorm_proj=unnorm_field[sl].sum(axis=axis)
-    norm_proj=norm_func(unnorm_proj)
-    return norm_proj
-
-def get_model(ckpt_path,conditioning_values=0,conditioning_channels=1,cond_value_mode="comb",cond_proj_bias=True,cropsize=256,
-gamma_min=-13.3,gamma_max=5.0,embedding_dim=48,norm_groups=8,threeD=False,noise_schedule="learned_linear",inpaint_model=False,
-device="cpu",verbose=0):
-    n_blocks= 4
-    if inpaint_model:
-        vdm = vdm_model_inpaint.LightVDM(
-            score_model=(networks.UNet3D4VDM if threeD else networks.UNet4VDM)(
-                gamma_min=gamma_min,
-                gamma_max=gamma_max,
-                embedding_dim=embedding_dim,
-                conditioning_values=conditioning_values,
-                conditioning_channels=conditioning_channels,
-                cond_value_mode=cond_value_mode,
-                cond_proj_bias=cond_proj_bias,
-                norm_groups= norm_groups,
-                n_blocks= n_blocks,
-            ),
-            gamma_min=gamma_min,
-            gamma_max=gamma_max,
-            image_shape=((1, cropsize,cropsize,cropsize)if threeD else (1, cropsize,cropsize)),
-            conditioning_values=conditioning_values,
-            noise_schedule = "learned_linear",
-            draw_figure=None,
-        )
-    else:
-        vdm = vdm_model.LightVDM(
-        score_model=(networks.UNet3D4VDM if threeD else networks.UNet4VDM)(
-            gamma_min=gamma_min,
-            gamma_max=gamma_max,
-            embedding_dim=embedding_dim,
-            conditioning_values=conditioning_values,
-            conditioning_channels=conditioning_channels,
-            cond_value_mode=cond_value_mode,
-            cond_proj_bias=cond_proj_bias,
-            norm_groups= norm_groups,
-            n_blocks= n_blocks,
-        ),
-        gamma_min=gamma_min,
-        gamma_max=gamma_max,
-        ignore_conditioning=True if conditioning_channels==0 else False,
-        image_shape=((1, cropsize,cropsize,cropsize)if threeD else (1, cropsize,cropsize)),
-        conditioning_values=conditioning_values,
-        noise_schedule = "learned_linear",
-        draw_figure=None,
-    )
-
-    vdm=vdm.to(device)
-    vdm=vdm.eval()
-
-    ckpt = torch.load(ckpt_path, map_location=device)
-    state_dict=get_old_state_dict(ckpt["state_dict"],verbose=verbose)
-    vdm.load_state_dict(state_dict)
-    return vdm
-
-def get_old_state_dict(state_dict,verbose=0):#cond_proj layers changed
-    new_state_dict={}
-    for key,value in state_dict.items():
-        if "score_model" in key and ".cond_proj." in key:
-            new_key=key.replace(".cond_proj.",".cond_projs.0.")
-            if verbose>0:
-                print("Modifying key: ",key," to ",new_key)
-            assert new_key not in state_dict.keys()
-            new_state_dict[new_key]=value
-        else:
-            new_state_dict[key]=value
-    return new_state_dict
 
 def get_ddnm_result(vdm,y,A,AT,n_sampling_steps=250,l=10,return_all=False,verbose=0,**kwargs):#,pos_mean=False
     if not isinstance(l,np.ndarray):
@@ -516,9 +326,3 @@ def get_smoothness(field,weight,return_maps=False,gradient=True):
     if return_maps:
         return z,in_field,cc
     return z
-
-def unnormalize(x,mean,std):
-    return x*std+mean
-
-def normalize(x,mean,std):
-    return (x-mean)/std

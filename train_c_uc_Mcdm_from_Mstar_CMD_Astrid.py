@@ -79,13 +79,20 @@ if __name__ == "__main__":
         mmap=False
     )
 
+    def pk_for_plot(field):#field is no batch, no channel
+        #field should be unnormalized
+        ks,pks,ns = utils.pk(field[None,None]/field.sum())
+        return ml_utils.to_np(ks[0]),ml_utils.to_np(pks[0])
+    def cc_for_plot(field1,field2):#field is no batch, no channel
+        ks,ccs = utils.get_ccs(field1[None,None]/field1.sum(),field2[None,None]/field2.sum(),full=False)
+        return ml_utils.to_np(ks[0]),ml_utils.to_np(ccs[0])
     def draw_figure(batch,samples):
         params={
             "x_to_im": lambda x: np.clip(ml_utils.to_np(x[0]),-2,6),#single channel Mcdm
             "conditioning_to_im": lambda x: ml_utils.to_np(x[0]),#single channel Mstar
             "conditioning_values_to_str": None,#no conditioning_values
-            "pk_func": lambda f,i_channel: utils.pk_for_plot(dm.unnorm_func(f,i_channel)),
-            "cc_func": lambda f1,f2,i_channel: utils.cc_for_plot(dm.unnorm_func(f1,i_channel),dm.unnorm_func(f2,i_channel)),
+            "pk_func": lambda f,i_channel: pk_for_plot(dm.unnorm_func(f,i_channel)),
+            "cc_func": lambda f1,f2,i_channel: cc_for_plot(dm.unnorm_func(f1,i_channel),dm.unnorm_func(f2,i_channel)),
         }   
         return utils.draw_figure(batch, samples, **params)
     
