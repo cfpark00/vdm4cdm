@@ -1,0 +1,38 @@
+{
+    "CMD":{
+        "IllustrisTNG":{
+            "CV":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mcdm_IllustrisTNG_CV_256_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mstar_IllustrisTNG_CV_256_z=0.0.npy",
+                    "B": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_B_IllustrisTNG_CV_256_z=0.0.npy",
+                    "HI": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_HI_IllustrisTNG_CV_256_z=0.0.npy",
+                    "Mgas": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mgas_IllustrisTNG_CV_256_z=0.0.npy",
+                    "MgFe": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_MgFe_IllustrisTNG_CV_256_z=0.0.npy",
+                    "Mtot": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mtot_IllustrisTNG_CV_256_z=0.0.npy",
+                    "ne": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_ne_IllustrisTNG_CV_256_z=0.0.npy",
+                    "P": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_P_IllustrisTNG_CV_256_z=0.0.npy",
+                    "T": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_T_IllustrisTNG_CV_256_z=0.0.npy",
+                    "Vcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Vcdm_IllustrisTNG_CV_256_z=0.0.npy",
+                    "Z": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Z_IllustrisTNG_CV_256_z=0.0.npy"
+                }
+            },
+            "LH":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mcdm_IllustrisTNG_LH_256_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mstar_IllustrisTNG_LH_256_z=0.0.npy",
+                    "B": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_B_IllustrisTNG_LH_256_z=0.0.npy",
+                    "HI": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_HI_IllustrisTNG_LH_256_z=0.0.npy",
+                    "Mgas": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mgas_IllustrisTNG_LH_256_z=0.0.npy",
+                    "MgFe": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_MgFe_IllustrisTNG_LH_256_z=0.0.npy",
+                    "Mtot": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mtot_IllustrisTNG_LH_256_z=0.0.npy",
+                    "ne": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_ne_IllustrisTNG_LH_256_z=0.0.npy",
+                    "P": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_P_IllustrisTNG_LH_256_z=0.0.npy",
+                    "T": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_T_IllustrisTNG_LH_256_z=0.0.npy",
+                    "Vcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Vcdm_IllustrisTNG_LH_256_z=0.0.npy",
+                    "Z": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Z_IllustrisTNG_LH_256_z=0.0.npy"
+                }
+            }
+        }
+    }
+}

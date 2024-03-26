@@ -12,8 +12,8 @@ import scipy.ndimage as sim
 
 #import sys
 #sys.path.append("../")
-from model import vdm_model,vdm_model_inpaint
-from model import networks
+from .model import vdm_model
+from .model import networks
 
 def to_np(ten):
     return ten.detach().cpu().numpy()
@@ -120,7 +120,106 @@ def pk_with_units(fields,fields2=None,boxsize=25,single_kss=True,to_numpy=True):
         pkss=to_np(pkss)
     return kss, pkss
 
-def draw_figure(x,sample,conditioning=None,
+def get_ccs(fields1,fields2,full=False):
+    ks,pks1,_=pk(fields1)
+    pks2=pk(fields2)[1]
+    n=len(fields2)
+    if full:
+        ccs=[]
+        for field1 in fields1:
+            _,ccs_,_=pk(field1[None].repeat(n,1,1,1),fields2=fields2)
+            ccs.append(ccs_)
+        ccs=torch.stack(ccs,dim=0)
+        ccs=ccs/torch.sqrt(pks1[:,None]*pks2[None,:])
+    else:
+        assert len(fields1)==len(fields2)
+        _,ccs,_=pk(fields1,fields2=fields2)
+        ccs=ccs/torch.sqrt(pks1*pks2)
+    return ks,ccs
+
+def pk_for_plot(field):#field is no batch, no channel
+    ks,pks,ns = pk(field[None,None]/field.sum())
+    return to_np(ks[0]),to_np(pks[0])
+
+def cc_for_plot(field1,field2):#field is no batch, no channel
+    ks,ccs = get_ccs(field1[None,None]/field1.sum(),field2[None,None]/field2.sum(),full=False)
+    return to_np(ks[0]),to_np(ccs[0])
+
+def draw_figure(batch, samples,**kwargs):
+    x = batch["x"]
+    conditioning = batch["conditioning"]
+    conditioning_values = batch["conditioning_values"]
+
+    params={
+        "index": 0,
+        "fontsize": 16,
+        "x_to_im": None,
+        "conditioning_to_im": None,
+        "conditioning_values_to_str": None,
+        "pk_func": None,
+        "cc_func": None,
+    }
+    params.update(kwargs)
+
+    fig, axes = plt.subplots(2,3,figsize=(20,12))
+    #--------Images
+    if conditioning is not None and params["conditioning_to_im"] is not None:
+        im=params["conditioning_to_im"](conditioning[params["index"]])
+        axes.flat[0].imshow(im)
+        axes.flat[0].set_title("Conditioning",fontsize=params["fontsize"])
+    if params["x_to_im"] is not None:
+        im=params["x_to_im"](x[params["index"]])
+        axes.flat[1].imshow(im)
+        axes.flat[1].set_title("GT Target",fontsize=params["fontsize"])
+        im=params["x_to_im"](samples[params["index"]])
+        axes.flat[2].imshow(im)
+        axes.flat[2].set_title("Sampled Target",fontsize=params["fontsize"])
+    #--------Stats
+    #histograms
+    for i_channel in range(x.shape[1]):
+        _ = axes.flat[3].hist(to_np(x[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='GT Channel '+str(i_channel))
+        _ = axes.flat[3].hist(to_np(samples[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='Sampled Channel '+str(i_channel))
+    if conditioning is not None:
+        for i_channel in range(conditioning.shape[1]):
+            _ = axes.flat[3].hist(to_np(conditioning[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='Conditioning Channel '+str(i_channel))
+    axes.flat[3].legend(fontsize=params["fontsize"])
+    #powerspectra
+    if params["pk_func"] is not None:
+        for i_channel in range(x.shape[1]):
+            ks,pks=params["pk_func"](x[params["index"],i_channel],i_channel)
+            axes.flat[4].plot(ks,pks,label='GT Channel '+str(i_channel))
+            ks,pks=params["pk_func"](samples[params["index"],i_channel],i_channel)
+            axes.flat[4].plot(ks,pks,label='Sampled Channel '+str(i_channel))
+        if conditioning is not None:
+            for i_channel in range(conditioning.shape[1]):
+                ks,pks=params["pk_func"](conditioning[params["index"],i_channel],i_channel)
+                axes.flat[4].plot(ks,pks,label='Conditioning Channel '+str(i_channel))
+        axes.flat[4].legend(fontsize=params["fontsize"])
+        axes.flat[4].set_xscale('log')
+        axes.flat[4].set_yscale('log')
+        axes.flat[4].set_xlabel('k/k_grid',fontsize=params["fontsize"])
+        axes.flat[4].set_ylabel('Raw Pk',fontsize=params["fontsize"])
+        axes.flat[4].set_title("Powerspectra",fontsize=params["fontsize"])
+    #Cross correlation
+    if params["cc_func"] is not None:
+        for i_channel in range(x.shape[1]):
+            ks,ccs=params["cc_func"](x[params["index"],i_channel],samples[params["index"],i_channel],i_channel)
+            axes.flat[5].plot(ks,ccs,label='CC GT-Sampled Channel '+str(i_channel))
+        axes.flat[5].legend(fontsize=params["fontsize"])
+        axes.flat[5].set_xscale('log')
+        axes.flat[5].set_xlabel('k',fontsize=params["fontsize"])
+        axes.flat[5].set_ylabel('CC',fontsize=params["fontsize"])
+        axes.flat[5].set_title("Cross Correlation",fontsize=params["fontsize"])
+    
+    if params["conditioning_values_to_str"] is not None:
+        text=params["conditioning_values_to_str"](conditioning_values[params["index"]])
+        #annotate in axes[0]
+        axes.flat[0].annotate(text, xy=(0, 0), xytext=(0.5, 0.5), textcoords='axes fraction', fontsize=params["fontsize"], ha='center', va='center')
+        #fig.suptitle(title,fontsize=params["fontsize"])
+    return fig
+
+
+def draw_figure_old(x,sample,conditioning=None,
 input_pk=False,names=["m_star","m_cdm"],vmMs=[[-4,4],[-4,4]],unnormalize=False,
 func_unnorm_input=None,func_norm_input=None,
 func_unnorm_target=None,func_norm_target=None,**kwargs):
@@ -294,7 +393,6 @@ def get_old_state_dict(state_dict,verbose=0):#cond_proj layers changed
             new_state_dict[key]=value
     return new_state_dict
 
-
 def get_ddnm_result(vdm,y,A,AT,n_sampling_steps=250,l=10,return_all=False,verbose=0,**kwargs):#,pos_mean=False
     if not isinstance(l,np.ndarray):
         if isinstance(l,int):
@@ -418,3 +516,9 @@ def get_smoothness(field,weight,return_maps=False,gradient=True):
     if return_maps:
         return z,in_field,cc
     return z
+
+def unnormalize(x,mean,std):
+    return x*std+mean
+
+def normalize(x,mean,std):
+    return (x-mean)/std

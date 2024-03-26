@@ -1,5 +1,13 @@
 analysis/*
-slurm_run/*
+slurmruns/*
 train_script_archive/*
 inpainting/*
+*__pycache__/
+data/
+data
+quick_notebooks/
+train_scripts/
+*archive/
+
+
 
