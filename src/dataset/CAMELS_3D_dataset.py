@@ -7,33 +7,37 @@ import json
 
 from .augmentation import Permutate, Flip, Normalize, Crop, LogTransform
 
-normalization_file = "/n/home12/cfpark00/Diffusion/vdm4cdm/src/dataset/normalizations.json"
+normalization_file = "/n/home12/cfpark00/Diffusion/vdm4cdm/src/dataset/normalizations_3d.json"
 all_normalizations = json.load(open(normalization_file))
 
-data_source_file = "/n/home12/cfpark00/Diffusion/vdm4cdm/src/dataset/data_source.json"
+data_source_file = "/n/home12/cfpark00/Diffusion/vdm4cdm/src/dataset/data_source_3d.json"
 data_source = json.load(open(data_source_file))
 
-alphas_file = "/n/home12/cfpark00/Diffusion/vdm4cdm/src/dataset/alphas.json"
+alphas_file = "/n/home12/cfpark00/Diffusion/vdm4cdm/src/dataset/alphas_3d.json"
 all_alphas = json.load(open(alphas_file))
 
 class AstroDataset(Dataset):
     def __init__(self, fields, params, return_func, ndim=2, do_crop=False, crop=32, pad=0, aug_shift=True, transform=None):
         self.nsamples=None
         self.fullsize=None
+        self.ndim = ndim
         self.n_fields=len(fields)
         for field in fields:
             if self.nsamples is None:
                 self.nsamples=len(field)
                 self.fullsize=field.shape[-1]
                 assert field.shape[-2]==self.fullsize
+                if self.ndim==3:
+                    assert field.shape[-3]==self.fullsize
             else:
                 assert len(field)==self.nsamples
                 assert field.shape[-1]==self.fullsize and field.shape[-2]==self.fullsize
+                if self.ndim==3:
+                    assert field.shape[-3]==self.fullsize
         assert len(params) == self.nsamples, f"len(params)={len(params)} != len(fields)={self.nsamples}"
         self.fields=fields
         self.params=params
         self.return_func=return_func
-        self.ndim = ndim
         self.do_crop = do_crop
         
         if self.do_crop:
@@ -47,15 +51,15 @@ class AstroDataset(Dataset):
         return self.nsamples
 
     def __getitem__(self, idx):
-        fields=[]
         if self.do_crop:
             bidx, icrop = divmod(idx, self.ncrops)
+            fields=[]
             for field in self.fields:
                 fields.append(field[bidx].copy())
-            for i in range(self.n_fields):
-                fields[i]=self.crop(fields[i], icrop)
+            fields=self.crop(fields, icrop)
             params=self.params[bidx]
         else:
+            fields=[]
             for field in self.fields:
                 fields.append(field[idx].copy())
             params=self.params[idx]
@@ -72,8 +76,9 @@ class AstroDataset(Dataset):
 class AstroDataModule(LightningDataModule):
     def __init__(
         self, selection, channel_names, return_func, stage="fit", batch_size=1,
-        do_crop=False, cropsize=256, num_workers=1,mmap=True):
+        do_crop=False, cropsize=256, ndim=2, num_workers=1,mmap=True):
         super().__init__()
+        self.ndim = ndim
         assert stage in ["fit", "test"], f"stage {stage} not recognized"
         self.selection = selection
         self.channel_names = channel_names
@@ -95,7 +100,7 @@ class AstroDataModule(LightningDataModule):
         base_transform=transforms.Compose([LogTransform(self.alphas), Normalize(means=self.means,stds=self.stds)])
 
         if stage == "fit":
-            self.transform=transforms.Compose([base_transform, Flip(ndim=2), Permutate(ndim=2)])
+            self.transform=transforms.Compose([base_transform, Flip(ndim=self.ndim), Permutate(ndim=self.ndim)])
         elif stage == "test":
             self.transform=base_transform
 
@@ -106,9 +111,9 @@ class AstroDataModule(LightningDataModule):
             field=np.expand_dims(np.load(file_path,mmap_mode="r" if self.mmap else None),1)#add channel dimension
             if selection["set_name"]=="CV":
                 inds=np.ones(len(field),dtype=bool)
-                inds[2*15:(2+1)*15]=0
-                inds[8*15:(8+1)*15]=0
-                inds[17*15:(17+1)*15]=0
+                inds[2:(2+1)]=0
+                inds[8:(8+1)]=0
+                inds[17:(17+1)]=0
                 field=field[inds]
             self.fields.append(field)
 
@@ -118,17 +123,16 @@ class AstroDataModule(LightningDataModule):
         self.params = np.loadtxt(f"/n/holystore01/LABS/itc_lab/Lab/Camels/params/params_{set_name}_{suite_name}.txt")
         if selection["set_name"]=="CV":
             inds=np.ones(len(self.params),dtype=bool)
-            inds[2*15:(2+1)*15]=0
-            inds[8*15:(8+1)*15]=0
-            inds[17*15:(17+1)*15]=0
+            inds[2:(2+1)]=0
+            inds[8:(8+1)]=0
+            inds[17:(17+1)]=0
             self.params=self.params[inds]
-        self.params=np.repeat(self.params,repeats=15,axis=0)# repeat for 15 slices in sim
 
 
-        data = AstroDataset(fields=self.fields, params=self.params, return_func=return_func, ndim=2, do_crop=self.do_crop, crop=self.cropsize,pad=0, aug_shift=True,transform=self.transform)
+        data = AstroDataset(fields=self.fields, params=self.params, return_func=return_func, ndim=self.ndim, do_crop=self.do_crop, crop=self.cropsize,pad=0, aug_shift=True,transform=self.transform)
 
         if stage == "fit":
-            train_set_size = int(len(data) * 0.9)
+            train_set_size = int(len(data) * 0.95)
             valid_set_size = len(data) - train_set_size
             self.train_data, self.valid_data = random_split(data, [train_set_size, valid_set_size])
             
@@ -195,15 +199,16 @@ class AstroDataModule(LightningDataModule):
 
 
 def get_dataset(
-    dataset_name="2df3d",
-    suite_name="IllustrisTNG",
+    dataset_name="CMD",
+    suite_name="Astrid",
     set_name="LH",
-    z_name="z_0.00",
-    channel_names=["Mcdm","Mstar"],
+    z_name="z_0.0",
+    channel_names=["Mcdm"],
     return_func=None,
     stage="fit",
     batch_size=1,
     cropsize=256,
+    ndim=3,
     num_workers=8,
     mmap=True
 ):
@@ -221,6 +226,7 @@ def get_dataset(
         batch_size=batch_size,
         do_crop=cropsize!=256, 
         cropsize=cropsize,
+        ndim=ndim,
         num_workers=num_workers,
         mmap=mmap
     )

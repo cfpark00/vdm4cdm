@@ -33,6 +33,20 @@
                     "Z": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Z_IllustrisTNG_LH_256_z=0.0.npy"
                 }
             }
+        },
+        "Astrid":{
+            "CV":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mcdm_Astrid_CV_256_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mstar_Astrid_CV_256_z=0.0.npy"
+                }
+            },
+            "LH":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mcdm_Astrid_LH_256_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mstar_Astrid_LH_256_z=0.0.npy"
+                }
+            }
         }
     }
 }

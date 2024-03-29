@@ -10,6 +10,8 @@ import scipy.stats as sstats
 import scipy.optimize as sopt
 import scipy.ndimage as sim
 
+import mltools.ml_utils as ml_utils
+
 #import sys
 #sys.path.append("../")
 from .model import vdm_model
@@ -162,11 +164,11 @@ def draw_figure(batch, samples,**kwargs):
     #--------Stats
     #histograms
     for i_channel in range(x.shape[1]):
-        _ = axes.flat[3].hist(to_np(x[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='GT Channel '+str(i_channel))
-        _ = axes.flat[3].hist(to_np(samples[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='Sampled Channel '+str(i_channel))
+        _ = axes.flat[3].hist(ml_utils.to_np(x[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='GT Channel '+str(i_channel))
+        _ = axes.flat[3].hist(ml_utils.to_np(samples[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='Sampled Channel '+str(i_channel))
     if conditioning is not None:
         for i_channel in range(conditioning.shape[1]):
-            _ = axes.flat[3].hist(to_np(conditioning[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='Conditioning Channel '+str(i_channel))
+            _ = axes.flat[3].hist(ml_utils.to_np(conditioning[params["index"],i_channel]).flatten(),bins=np.linspace(-4,4,50),histtype="step",label='Conditioning Channel '+str(i_channel))
     axes.flat[3].legend(fontsize=params["fontsize"])
     #powerspectra
     if params["pk_func"] is not None:
