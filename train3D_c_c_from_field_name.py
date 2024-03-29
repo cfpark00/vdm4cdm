@@ -52,7 +52,7 @@ if __name__ == "__main__":
     #model
     input_channels=1
     conditioning_channels = 1
-    conditioning_values = 0
+    conditioning_values = 6
     chs=[48, 96, 192, 384]
     gamma_min = -13.3
     gamma_max = 13.3

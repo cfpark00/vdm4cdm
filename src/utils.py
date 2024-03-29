@@ -12,10 +12,6 @@ import scipy.ndimage as sim
 
 import mltools.ml_utils as ml_utils
 
-#import sys
-#sys.path.append("../")
-from .model import vdm_model
-from .model import networks
 
 def power(x,x2=None):
     """
