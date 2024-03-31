@@ -116,14 +116,13 @@ class AstroDataModule(LightningDataModule):
         set_name = selection["set_name"]
         suite_name = selection["suite_name"]
         self.params = np.loadtxt(f"/n/holystore01/LABS/itc_lab/Lab/Camels/params/params_{set_name}_{suite_name}.txt")
+        self.params=np.repeat(self.params,repeats=15,axis=0)# repeat for 15 slices in sim
         if selection["set_name"]=="CV":
             inds=np.ones(len(self.params),dtype=bool)
             inds[2*15:(2+1)*15]=0
             inds[8*15:(8+1)*15]=0
             inds[17*15:(17+1)*15]=0
             self.params=self.params[inds]
-        self.params=np.repeat(self.params,repeats=15,axis=0)# repeat for 15 slices in sim
-
 
         data = AstroDataset(fields=self.fields, params=self.params, return_func=return_func, ndim=2, do_crop=self.do_crop, crop=self.cropsize,pad=0, aug_shift=True,transform=self.transform)
 
