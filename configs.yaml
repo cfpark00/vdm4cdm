@@ -1,0 +1,220 @@
+VDM_Go7_Mcdm_c_c_128:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/9b805e3c8948438f89b16d861340452f/checkpoints/epoch=673-step=320000.ckpt
+  in_field_name: Go7
+  out_field_name: Mcdm
+  cropsize: 128
+  chs:
+    - 32
+    - 64
+    - 128
+    - 256
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 320000
+  res: 128
+  data_params:
+    dataset_name: CMD_128
+
+VDM_Go8_Mcdm_c_c_128:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/ebb94e1056d64bf09cc89a6c3f69f04f/checkpoints/epoch=673-step=320000.ckpt
+  in_field_name: Go8
+  out_field_name: Mcdm
+  cropsize: 128
+  chs:
+    - 32
+    - 64
+    - 128
+    - 256
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 320000
+  res: 128
+  data_params:
+    dataset_name: CMD_128
+
+VDM_Go9_Mcdm_c_c_128:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/0f2343057d5547e8a50ba21333bae86c/checkpoints/epoch=673-step=320000.ckpt
+  in_field_name: Go9
+  out_field_name: Mcdm
+  cropsize: 128
+  chs:
+    - 32
+    - 64
+    - 128
+    - 256
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 320000
+  res: 128
+  data_params:
+    dataset_name: CMD_128
+
+VDM_Mstar_Mcdm_c_c_128:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/b251ebba620b451e8f3c14438861e664/checkpoints/epoch=1344-step=320000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 128
+  chs:
+    - 32
+    - 64
+    - 128
+    - 256
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 320000
+  res: 128
+  data_params:
+    dataset_name: CMD_128
+
+VDM_Mstar_Mcdm_c_c_160:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/94f89b66270a45229944d867720a2fc4/checkpoints/epoch=673-step=320000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 160
+  chs:
+    - 32
+    - 64
+    - 128
+    - 256
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 320000
+  res: 160
+  data_params:
+    dataset_name: CMD_160
+
+VDM_Mstar_Mcdm_c_c_192: 
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/cb77e247bece4862b410835b9ed5de47/checkpoints/epoch=231-step=110000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 192
+  chs:
+    - 32
+    - 64
+    - 128
+    - 256
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 320000
+  res: 192
+  data_params:
+    dataset_name: CMD_192
+
+VDM_Mstar_Mcdm_c_c_224:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/450845cace2442308acb6158f8046ab5/checkpoints/epoch=673-step=320000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 224
+  chs:
+    - 16
+    - 32
+    - 64
+    - 128
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 320000
+  res: 224
+  data_params:
+    dataset_name: CMD_224
+
+VDM_Mstar_Mcdm_c_c_256:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/647d106b0dd347ffab5791438f34fc40/checkpoints/epoch=442-step=210000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 256
+  chs:
+    - 16
+    - 32
+    - 64
+    - 128
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 320000
+  res: 256
+  data_params:
+    dataset_name: CMD
+
+VDM_Mstar_Mcdm_c_c_256_comp:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/647d106b0dd347ffab5791438f34fc40/checkpoints/epoch=252-step=120000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 256
+  chs:
+    - 16
+    - 32
+    - 64
+    - 128
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 230000
+  res: 256
+  data_params:
+    dataset_name: CMD
+
+VDM_Mstar_Mcdm_c_uc_256:
+  type: VDM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/vdm4cdm-3D/e50bc643127346078985cdabcfa14367/checkpoints/epoch=252-step=120000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 256
+  chs:
+    - 16
+    - 32
+    - 64
+    - 128
+  conditioning_channels: 1
+  conditioning_values: 0
+  steps: 230000
+  res: 256
+  data_params:
+    dataset_name: CMD
+
+
+
+SFM_Mstar_Mcdm_c_c_128:
+  type: SFM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/sfm4cdm-3D/1245995407114f90b7ace996e55d037a/checkpoints/epoch=1680-step=400000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 128
+  chs:
+    - 32
+    - 64
+    - 128
+    - 256
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 400000
+  res: 128
+  data_params:
+    dataset_name: CMD_128
+
+SFM_Mstar_Mcdm_c_c_256:
+  type: SFM
+  ckpt_path: /n/holylfs06/LABS/finkbeiner_lab/Users/cfpark00/datadir/Diffusion_vdm4cdm_dev/comet_logs/sfm4cdm-3D/29081bd864af474bb4e6b308fbac34e1/checkpoints/epoch=252-step=120000.ckpt
+  in_field_name: Mstar
+  out_field_name: Mcdm
+  cropsize: 256
+  chs:
+    - 16
+    - 32
+    - 64
+    - 128
+  conditioning_channels: 1
+  conditioning_values: 6
+  steps: 120000
+  res: 256
+  data_params:
+    dataset_name: CMD
+
+#LDM:
+

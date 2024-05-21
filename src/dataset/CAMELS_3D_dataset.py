@@ -120,7 +120,7 @@ class AstroDataModule(LightningDataModule):
         # Load parameters
         set_name = selection["set_name"]
         suite_name = selection["suite_name"]
-        self.params = np.loadtxt(f"/n/holystore01/LABS/itc_lab/Lab/Camels/params/params_{set_name}_{suite_name}.txt")
+        self.params = np.loadtxt(f"/n/holystore01/LABS/itc_lab/Lab/Camels/params_new/params_{set_name}_{suite_name}.txt")
         if selection["set_name"]=="CV":
             inds=np.ones(len(self.params),dtype=bool)
             inds[2:(2+1)]=0
@@ -129,7 +129,8 @@ class AstroDataModule(LightningDataModule):
             self.params=self.params[inds]
 
 
-        data = AstroDataset(fields=self.fields, params=self.params, return_func=return_func, ndim=self.ndim, do_crop=self.do_crop, crop=self.cropsize,pad=0, aug_shift=True,transform=self.transform)
+        data = AstroDataset(fields=self.fields, params=self.params, return_func=return_func, ndim=self.ndim,
+                            do_crop=self.do_crop, crop=self.cropsize,pad=0, aug_shift=(True if stage=="fit" else False),transform=self.transform)
 
         if stage == "fit":
             train_set_size = int(len(data) * 0.95)

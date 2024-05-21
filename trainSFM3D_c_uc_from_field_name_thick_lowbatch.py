@@ -33,7 +33,7 @@ def train(
         save_dir="./data/comet_logs/",
         api_key=os.environ.get("COMET_API_KEY"),
         project_name="sfm4cdm-3D",
-        experiment_name=f"LH_c_uc_{field_in}_to_{field_out}",
+        experiment_name=f"LH_c_uc_{field_in}_to_{field_out}_thick_lowbatch_{cropsize}",
     )
     trainer = Trainer(
         logger=comet_logger,
@@ -57,8 +57,8 @@ if __name__ == "__main__":
     input_channels=1
     conditioning_channels = 1
     conditioning_values = 0
-    chs=[12,36,64,128]
-    norm_groups = 4
+    chs=[16,32,64,128]
+    norm_groups = 8
     mid_attn= False
     n_attention_heads = 4
     dropout_prob = 0.1
@@ -123,5 +123,6 @@ if __name__ == "__main__":
         )
     sfm=sfm_model.LightSFM(velocity_model=velocity_model,
                         draw_figure=draw_figure,
+                        learning_rate=3.0e-4
                         )
     train(model=sfm, datamodule=dm)

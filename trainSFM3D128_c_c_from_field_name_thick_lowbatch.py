@@ -33,7 +33,7 @@ def train(
         save_dir="./data/comet_logs/",
         api_key=os.environ.get("COMET_API_KEY"),
         project_name="sfm4cdm-3D",
-        experiment_name=f"LH_c_uc_{field_in}_to_{field_out}",
+        experiment_name=f"LH128_c_c_{field_in}_to_{field_out}_thick_lowbatch_{cropsize}",
     )
     trainer = Trainer(
         logger=comet_logger,
@@ -56,22 +56,22 @@ if __name__ == "__main__":
     #model
     input_channels=1
     conditioning_channels = 1
-    conditioning_values = 0
-    chs=[12,36,64,128]
-    norm_groups = 4
+    conditioning_values = 6
+    chs=[32,64,128,256]
+    norm_groups = 8
     mid_attn= False
     n_attention_heads = 4
     dropout_prob = 0.1
 
     #dataset
     cropsize=cropsize
-    batch_size = 2
+    batch_size = 4
     num_workers = 16
 
     def return_func(fields,params):
-        return {"x0":fields[0],"x1":fields[1],"conditioning_values":None}
+        return {"x0":fields[0],"x1":fields[1],"conditioning_values":[params]}
     dm = CAMELS_3D_dataset.get_dataset(
-        dataset_name="CMD",
+        dataset_name="CMD_128",
         suite_name=suite_name,
         return_func=return_func,
         set_name="LH",
@@ -86,10 +86,10 @@ if __name__ == "__main__":
 
     def x_to_im(field):
         x_unnorm=dm.unnorm_func(field,1)
-        return ml_utils.to_np(dm.norm_func(x_unnorm[0,:,:,:32].sum(-1),1))
+        return ml_utils.to_np(dm.norm_func(x_unnorm[0,:,:,:48].sum(-1),1))
     def conditioning_to_im(field):
         conditioning_unnorm=dm.unnorm_func(field,0)
-        return ml_utils.to_np(dm.norm_func(conditioning_unnorm[0,:,:,:32].sum(-1),0))
+        return ml_utils.to_np(dm.norm_func(conditioning_unnorm[0,:,:,:48].sum(-1),0))
     def pk_for_plot(field):#field is no batch, no channel
         #field should be unnormalized
         ks,pks,ns = utils.pk(field[None,None]/field.sum())
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         params={
             "x_to_im": x_to_im,#single channel Mcdm
             "conditioning_to_im": conditioning_to_im,#single channel Mstar
-            "conditioning_values_to_str": None,#no conditioning_values
+            "conditioning_values_to_str": str,#no conditioning_values
             "pk_func": lambda f,i_channel: pk_for_plot(dm.unnorm_func(f,i_channel)),
             "cc_func": lambda f1,f2,i_channel: cc_for_plot(dm.unnorm_func(f1,i_channel),dm.unnorm_func(f2,i_channel)),
         }   
@@ -123,5 +123,6 @@ if __name__ == "__main__":
         )
     sfm=sfm_model.LightSFM(velocity_model=velocity_model,
                         draw_figure=draw_figure,
+                        learning_rate=3.0e-4
                         )
     train(model=sfm, datamodule=dm)

@@ -41,10 +41,113 @@
                     "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mstar_Astrid_CV_256_z=0.0.npy"
                 }
             },
+            "1P":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mcdm_Astrid_1P_256_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mstar_Astrid_1P_256_z=0.0.npy"
+                }
+            },
             "LH":{
                 "z_0.0":{
                     "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mcdm_Astrid_LH_256_z=0.0.npy",
-                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mstar_Astrid_LH_256_z=0.0.npy"
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Mstar_Astrid_LH_256_z=0.0.npy",
+                    "Go7": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Go7_Astrid_LH_256_z=0.0.npy",
+                    "Go8": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Go8_Astrid_LH_256_z=0.0.npy",
+                    "Go9": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_new/Grids_Go9_Astrid_LH_256_z=0.0.npy"
+                }
+            }
+        }
+    },
+    "CMD_128":{
+        "Astrid":{
+            "CV":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Mcdm_Astrid_CV_128_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Mstar_Astrid_CV_128_z=0.0.npy",
+                    "Go7": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Go7_Astrid_CV_128_z=0.0.npy",
+                    "Go8": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Go8_Astrid_CV_128_z=0.0.npy",
+                    "Go9": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Go9_Astrid_CV_128_z=0.0.npy"
+                }
+            },
+            "1P":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Mcdm_Astrid_1P_128_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Mstar_Astrid_1P_128_z=0.0.npy"
+                }
+            },
+            "LH":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Mcdm_Astrid_LH_128_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Mstar_Astrid_LH_128_z=0.0.npy",
+                    "Go7": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Go7_Astrid_LH_128_z=0.0.npy",
+                    "Go8": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Go8_Astrid_LH_128_z=0.0.npy",
+                    "Go9": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_128/Grids_Go9_Astrid_LH_128_z=0.0.npy"
+                }
+            }
+        }
+    },
+    "CMD_160":{
+        "Astrid":{
+            "CV":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_160/Grids_Mcdm_Astrid_CV_160_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_160/Grids_Mstar_Astrid_CV_160_z=0.0.npy"
+                }
+            },
+            "1P":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_160/Grids_Mcdm_Astrid_1P_160_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_160/Grids_Mstar_Astrid_1P_160_z=0.0.npy"
+                }
+            },
+            "LH":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_160/Grids_Mcdm_Astrid_LH_160_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_160/Grids_Mstar_Astrid_LH_160_z=0.0.npy"
+                }
+            }
+        }
+    },
+    "CMD_192":{
+        "Astrid":{
+            "CV":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_192/Grids_Mcdm_Astrid_CV_192_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_192/Grids_Mstar_Astrid_CV_192_z=0.0.npy"
+                }
+            },
+            "1P":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_192/Grids_Mcdm_Astrid_1P_192_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_192/Grids_Mstar_Astrid_1P_192_z=0.0.npy"
+                }
+            },
+            "LH":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_192/Grids_Mcdm_Astrid_LH_192_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_192/Grids_Mstar_Astrid_LH_192_z=0.0.npy"
+                }
+            }
+        }
+    },
+    "CMD_224":{
+        "Astrid":{
+            "CV":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_224/Grids_Mcdm_Astrid_CV_224_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_224/Grids_Mstar_Astrid_CV_224_z=0.0.npy"
+                }
+            },
+            "1P":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_224/Grids_Mcdm_Astrid_1P_224_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_224/Grids_Mstar_Astrid_1P_224_z=0.0.npy"
+                }
+            },
+            "LH":{
+                "z_0.0":{
+                    "Mcdm": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_224/Grids_Mcdm_Astrid_LH_224_z=0.0.npy",
+                    "Mstar": "/n/holystore01/LABS/itc_lab/Lab/Camels/3D_grids_224/Grids_Mstar_Astrid_LH_224_z=0.0.npy"
                 }
             }
         }

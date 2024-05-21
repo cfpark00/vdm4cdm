@@ -284,7 +284,7 @@ def get_ddnm_result(vdm,y,A,AT,n_sampling_steps=250,l=10,return_all=False,verbos
     assert np.issubdtype(l.dtype, np.integer),"l must be integer"
     assert isinstance(l,np.ndarray) and l.ndim==1 and len(l)==n_sampling_steps,"l must be 1d array of length n_sampling_steps or a single integer>0 or a list of integers>0"
     steps = torch.linspace(1.0,0.0,n_sampling_steps + 1,device=vdm.device)
-    z=torch.randn((y.shape[0], *vdm.model.image_shape),device=vdm.device,)
+    z=torch.randn((y.shape[0], *vdm.model.score_model.shape),device=vdm.device,)
     ATy=AT(y)
     if return_all:
         xs=[]
@@ -397,3 +397,79 @@ def get_smoothness(field,weight,return_maps=False,gradient=True):
     if return_maps:
         return z,in_field,cc
     return z
+
+def get_datamodule(config):
+    if "data_params" not in config:
+        assert False,"data_params not in config"
+    cropsize=config["cropsize"]
+    in_field_name=config["in_field_name"]
+    out_field_name=config["out_field_name"]
+
+    data_params=config["data_params"]
+    dataset_name=data_params["dataset_name"]
+    suite_name=data_params.get("suite_name","Astrid")
+    set_name=data_params.get("set_name","CV")
+    z_name=data_params.get("z_name","z_0.0")
+    stage=data_params.get("stage","test")
+    batch_size=data_params.get("batch_size",1)
+
+    from src.dataset import CAMELS_3D_dataset
+    def return_func(fields,params):
+        return {"conditioning":fields[0],"x":fields[1],"conditioning_values":[params]}
+    dm = CAMELS_3D_dataset.get_dataset(
+            dataset_name=dataset_name,
+            suite_name=suite_name,
+            return_func=return_func,
+            set_name=set_name,
+            z_name=z_name,
+            channel_names=[in_field_name,out_field_name],
+            stage=stage,
+            batch_size=batch_size,
+            cropsize=cropsize,
+            num_workers=8,
+            mmap=False
+        )
+    return dm
+
+def get_model(config):
+    if config["type"]=="VDM":
+        input_channels=1
+        conditioning_channels = config.get("conditioning_channels", 1)
+        conditioning_values = config.get("conditioning_values", 6)
+        chs=config.get("chs",[32,64,128,256])
+        norm_groups = 8
+        mid_attn= False
+        n_attention_heads = 4
+        dropout_prob = 0.1
+        #
+        gamma_max=13.3
+        cropsize=config.get("cropsize",128)
+
+        from mltools.networks import networks
+        from mltools.models import vdm_model
+        shape=(input_channels, cropsize,cropsize,cropsize)
+        score_model=networks.CUNet(
+                shape=shape,
+                chs=chs,
+                s_conditioning_channels =conditioning_channels,
+                v_conditioning_dims =[] if conditioning_values==0 else [conditioning_values],
+                t_conditioning=True,
+                norm_groups=norm_groups,
+                mid_attn=mid_attn,
+                dropout_prob=dropout_prob,
+                conv_padding_mode = "circular" if cropsize==256 else "zeros",
+                n_attention_heads=n_attention_heads
+                )
+        vdm=vdm_model.LightVDM(score_model=score_model,
+                            draw_figure=None,
+                            gamma_max=gamma_max,
+                            learning_rate=3.0e-4
+                            )
+        if "ckpt_path" in config:
+            vdm.load_state_dict(torch.load(config["ckpt_path"])["state_dict"])
+            #print(f"Loaded model from {config['ckpt_path']}")
+        return vdm
+    elif config["type"]=="SFM":
+        pass
+    else:
+        raise ValueError(f"Unknown model type {config['type']}")

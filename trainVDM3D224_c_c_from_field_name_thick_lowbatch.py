@@ -7,7 +7,7 @@ from lightning.pytorch.callbacks import LearningRateMonitor,ModelCheckpoint
 import numpy as np
 
 #custom
-import mltools.models.sfm_model as sfm_model
+import mltools.models.vdm_model as vdm_model
 import mltools.networks.networks as networks
 import mltools.ml_utils as ml_utils
 
@@ -32,15 +32,15 @@ def train(
     comet_logger = CometLogger(
         save_dir="./data/comet_logs/",
         api_key=os.environ.get("COMET_API_KEY"),
-        project_name="sfm4cdm-3D",
-        experiment_name=f"LH_c_uc_{field_in}_to_{field_out}",
+        project_name="vdm4cdm-3D",
+        experiment_name=f"LH224_c_c_{field_in}_to_{field_out}_thick_lowbatch_{cropsize}",
     )
     trainer = Trainer(
         logger=comet_logger,
         accelerator="auto",
         devices=1 if torch.cuda.is_available() else None,
         max_steps=1_000_000,
-        val_check_interval=1000,
+        val_check_interval=5000,
         check_val_every_n_epoch=None,
         gradient_clip_val=0.5,
         callbacks=[LearningRateMonitor(),
@@ -56,12 +56,16 @@ if __name__ == "__main__":
     #model
     input_channels=1
     conditioning_channels = 1
-    conditioning_values = 0
-    chs=[12,36,64,128]
-    norm_groups = 4
+    conditioning_values = 6
+    chs=[16,32,64,128]
+    norm_groups = 8
     mid_attn= False
     n_attention_heads = 4
     dropout_prob = 0.1
+
+
+    #
+    gamma_max=13.3
 
     #dataset
     cropsize=cropsize
@@ -69,9 +73,9 @@ if __name__ == "__main__":
     num_workers = 16
 
     def return_func(fields,params):
-        return {"x0":fields[0],"x1":fields[1],"conditioning_values":None}
+        return {"conditioning":fields[0],"x":fields[1],"conditioning_values":[params]}
     dm = CAMELS_3D_dataset.get_dataset(
-        dataset_name="CMD",
+        dataset_name="CMD_224",
         suite_name=suite_name,
         return_func=return_func,
         set_name="LH",
@@ -86,10 +90,10 @@ if __name__ == "__main__":
 
     def x_to_im(field):
         x_unnorm=dm.unnorm_func(field,1)
-        return ml_utils.to_np(dm.norm_func(x_unnorm[0,:,:,:32].sum(-1),1))
+        return ml_utils.to_np(dm.norm_func(x_unnorm[0,:,:,:48].sum(-1),1))
     def conditioning_to_im(field):
         conditioning_unnorm=dm.unnorm_func(field,0)
-        return ml_utils.to_np(dm.norm_func(conditioning_unnorm[0,:,:,:32].sum(-1),0))
+        return ml_utils.to_np(dm.norm_func(conditioning_unnorm[0,:,:,:48].sum(-1),0))
     def pk_for_plot(field):#field is no batch, no channel
         #field should be unnormalized
         ks,pks,ns = utils.pk(field[None,None]/field.sum())
@@ -101,15 +105,15 @@ if __name__ == "__main__":
         params={
             "x_to_im": x_to_im,#single channel Mcdm
             "conditioning_to_im": conditioning_to_im,#single channel Mstar
-            "conditioning_values_to_str": None,#no conditioning_values
+            "conditioning_values_to_str": str,#no conditioning_values
             "pk_func": lambda f,i_channel: pk_for_plot(dm.unnorm_func(f,i_channel)),
             "cc_func": lambda f1,f2,i_channel: cc_for_plot(dm.unnorm_func(f1,i_channel),dm.unnorm_func(f2,i_channel)),
         }   
-        return utils.draw_figure_sfm(batch, samples, **params)
+        return utils.draw_figure(batch, samples, **params)
     
     shape=(input_channels, cropsize,cropsize,cropsize)
 
-    velocity_model=networks.CUNet(
+    score_model=networks.CUNet(
         shape=shape,
         chs=chs,
         s_conditioning_channels =conditioning_channels,
@@ -121,7 +125,9 @@ if __name__ == "__main__":
         conv_padding_mode = "circular" if cropsize==256 else "zeros",
         n_attention_heads=n_attention_heads
         )
-    sfm=sfm_model.LightSFM(velocity_model=velocity_model,
+    vdm=vdm_model.LightVDM(score_model=score_model,
                         draw_figure=draw_figure,
+                        gamma_max=gamma_max,
+                        learning_rate=3.0e-4
                         )
-    train(model=sfm, datamodule=dm)
+    train(model=vdm, datamodule=dm)
